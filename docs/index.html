@@ -144,6 +144,9 @@ textarea.form-input{resize:vertical;min-height:72px}
       <div class="next-badge">▶ 다음 차례</div>
       <div class="next-title" id="nextTitle"></div>
       <div class="next-meta" id="nextMeta"></div>
+      <button onclick="triggerNext()" style="margin-top:12px;width:100%;padding:10px;background:#FFD60A;color:#000;font-weight:700;border-radius:8px;font-size:14px;border:none;cursor:pointer">
+        ⚡ 이 주제로 즉시 영상 생성
+      </button>
     </div>
 
     <div id="topicContainer">
@@ -183,11 +186,9 @@ textarea.form-input{resize:vertical;min-height:72px}
         <textarea id="reqDesc" class="form-input" placeholder="어떤 내용을 다뤄야 할지 간단히 적어주세요"></textarea>
       </div>
 
-      <button class="btn-primary" onclick="submitTopic(false)">📌 영상 생성 요청</button>
-
-      <div id="triggerWrap" style="display:none">
-        <div class="divider"><div class="divider-line"></div><span class="divider-text">또는</span><div class="divider-line"></div></div>
-        <button class="btn-secondary" onclick="submitTopic(true)">⚡ 요청 + 즉시 GitHub Actions 실행</button>
+      <button class="btn-primary" onclick="submitTopic()">⚡ 영상 즉시 생성 요청</button>
+      <div id="noTokenMsg" style="display:none;font-size:11px;color:#fb923c;margin-top:8px;text-align:center">
+        ⚠️ GitHub Token 미설정 — 설정에서 입력하면 즉시 실행됩니다 (다음 KST 07:00에 생성)
       </div>
     </div>
 
@@ -386,44 +387,62 @@ async function loadHistory() {
 }
 
 // ── 주제 제출 ─────────────────────────────────────
-async function submitTopic(triggerNow) {
+async function submitTopic() {
   if (!sb) { openModal(); return; }
   var title = document.getElementById('reqTitle').value.trim();
   if (!title) { toast('주제명을 입력하세요'); return; }
 
-  var maxRes = await sb.from('topics').select('order_index').order('order_index',{ascending:false}).limit(1);
-  var nextIdx = (maxRes.data && maxRes.data.length) ? maxRes.data[0].order_index + 1 : 100;
-
+  // order_index = -1 → 기존 대기 주제보다 무조건 먼저 선택됨
   var ins = await sb.from('topics').insert({
     title: title, title_en: title,
     category: document.getElementById('reqCat').value,
     level: document.getElementById('reqLevel').value,
     description: document.getElementById('reqDesc').value.trim() || title+'에 대한 경제 교육 콘텐츠',
-    status: 'pending', order_index: nextIdx,
+    status: 'pending', order_index: -1,
     prerequisites: [], related_topics: []
   });
 
   if (ins.error) { toast('오류: ' + ins.error.message); return; }
 
-  if (triggerNow) await triggerActions();
-
   document.getElementById('reqTitle').value = '';
   document.getElementById('reqDesc').value  = '';
+
+  // GitHub Token 있으면 즉시 Actions 트리거, 없으면 안내
+  if (cfg.token && cfg.repo) {
+    var ok = await triggerActions();
+    document.getElementById('noTokenMsg').style.display = 'none';
+    toast('요청 완료 — GitHub Actions 실행 중');
+  } else {
+    document.getElementById('noTokenMsg').style.display = 'block';
+    toast('요청 접수 — GitHub Token 설정 시 즉시 실행 가능');
+  }
+
   document.getElementById('resultCard').style.display = 'block';
-  toast(triggerNow ? '요청 + Actions 실행됨' : '영상 생성 요청 완료');
-  setTimeout(function(){ document.getElementById('resultCard').style.display='none'; }, 4000);
+  setTimeout(function(){ document.getElementById('resultCard').style.display='none'; }, 5000);
   loadCurriculum();
 }
 
 async function triggerActions() {
-  if (!cfg.token || !cfg.repo) { toast('GitHub 설정이 없습니다'); return; }
+  if (!cfg.token || !cfg.repo) return false;
   var parts = cfg.repo.split('/');
   var res = await fetch('https://api.github.com/repos/'+parts[0]+'/'+parts[1]+'/actions/workflows/daily_shorts.yml/dispatches', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer '+cfg.token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ref:'main'})
   });
-  if (!res.ok) toast('GitHub 실행 실패: ' + res.status);
+  if (!res.ok) { toast('GitHub 실행 실패: ' + res.status); return false; }
+  return true;
+}
+
+
+async function triggerNext() {
+  if (!cfg.token || !cfg.repo) {
+    toast('⚙️ 설정에서 GitHub Token을 입력하세요');
+    openModal();
+    return;
+  }
+  var ok = await triggerActions();
+  if (ok) toast('⚡ GitHub Actions 실행 시작됨');
 }
 
 // ── 유틸 ─────────────────────────────────────────

@@ -1,0 +1,53 @@
+-- ============================================================
+-- 초기화 스크립트 — Supabase SQL Editor에서 실행
+-- 영상 히스토리 전체 삭제 + 커리큘럼 초기화
+-- ============================================================
+
+-- 1. 영상 히스토리 전체 삭제
+DELETE FROM videos;
+
+-- 2. 커리큘럼 초기화 (테스트로 추가된 주제 삭제 + 기본 20개만 남기고 pending으로 리셋)
+DELETE FROM topics;
+
+-- 3. 기본 20개 주제 재삽입
+INSERT INTO topics (title, title_en, level, category, description, order_index) VALUES
+('금리란 무엇인가',        'What is Interest Rate',        'basic',        '거시경제', '돈을 빌리는 비용, 금리의 기본 개념',  1),
+('인플레이션이란',         'What is Inflation',            'basic',        '거시경제', '물가 상승의 의미와 원인',             2),
+('GDP란 무엇인가',         'What is GDP',                  'basic',        '거시경제', '국내총생산의 의미와 측정 방법',       3),
+('중앙은행의 역할',        'Role of Central Bank',         'basic',        '거시경제', '한국은행과 Fed의 역할',              4),
+('경기 사이클이란',        'What is Business Cycle',       'basic',        '거시경제', '경기 확장과 수축의 반복',             5),
+('주식이란 무엇인가',      'What is a Stock',              'basic',        '투자',     '주식의 기본 개념과 주주의 권리',      6),
+('채권이란 무엇인가',      'What is a Bond',               'basic',        '투자',     '채권의 구조와 이자 지급 방식',        7),
+('펀드와 ETF의 차이',      'Fund vs ETF',                  'basic',        '투자',     '집합투자의 두 가지 방식 비교',        8),
+('복리의 마법',            'Power of Compound Interest',   'basic',        '투자',     '시간이 만드는 복리 효과',             9),
+('분산 투자란',            'What is Diversification',      'basic',        '투자',     '리스크를 줄이는 포트폴리오 구성',    10),
+('환율이란 무엇인가',      'What is Exchange Rate',        'basic',        '금융시장', '두 나라 통화의 교환 비율',           11),
+('주식시장은 어떻게 작동하나', 'How Stock Market Works',   'basic',        '금융시장', '코스피·나스닥 시장의 작동 원리',     12),
+('공급과 수요의 원리',     'Supply and Demand',            'basic',        '거시경제', '가격을 결정하는 기본 원리',          13),
+('세금의 종류와 역할',     'Types of Taxes',               'basic',        '재정',     '소득세·부가세 등 세금의 기초',       14),
+('가계부채란 무엇인가',    'What is Household Debt',       'basic',        '거시경제', '가계 대출의 구조와 위험성',          15),
+('통화정책이란',           'Monetary Policy',              'intermediate', '거시경제', '중앙은행이 금리로 경제를 조절하는 방법', 16),
+('재정정책이란',           'Fiscal Policy',                'intermediate', '거시경제', '정부 지출과 세금으로 경제를 조절',      17),
+('양적완화란',             'Quantitative Easing',          'intermediate', '거시경제', '돈을 푸는 비전통적 통화정책',           18),
+('PER과 PBR 읽는 법',      'How to Read PER and PBR',      'intermediate', '투자',     '주식 가치 평가 지표 해석',              19),
+('금리와 채권 가격의 관계', 'Interest Rate and Bond Price', 'intermediate', '투자',     '금리 상승 시 채권 가격이 떨어지는 이유', 20)
+ON CONFLICT DO NOTHING;
+
+-- 4. prerequisites 재연결
+UPDATE topics SET prerequisites = ARRAY(
+  SELECT id FROM topics WHERE title = '금리란 무엇인가'
+) WHERE title = '통화정책이란';
+
+UPDATE topics SET prerequisites = ARRAY(
+  SELECT id FROM topics WHERE title IN ('금리란 무엇인가', '채권이란 무엇인가')
+) WHERE title = '금리와 채권 가격의 관계';
+
+UPDATE topics SET prerequisites = ARRAY(
+  SELECT id FROM topics WHERE title = '통화정책이란'
+) WHERE title = '양적완화란';
+
+UPDATE topics SET prerequisites = ARRAY(
+  SELECT id FROM topics WHERE title = '주식이란 무엇인가'
+) WHERE title = 'PER과 PBR 읽는 법';
+
+SELECT '✅ 초기화 완료 — topics: ' || COUNT(*) || '개' FROM topics;
