@@ -20,10 +20,20 @@ PROMPT_TEMPLATE = '''
 
 [요구사항]
 - 대상: 경제를 처음 배우는 20~30대
-- 전체 나레이션: 500자 이내 (60초 기준)
-- 슬라이드 4장, 각 슬라이드마다 개별 나레이션 포함
-- 슬라이드 구성: 도입 → 핵심개념 → 예시/수치 → 정리
-- 각 슬라이드 나레이션은 해당 이미지와 함께 표시됨 (TTS 읽는 동안 이미지 유지)
+- 세그먼트 수: 6~8개 (주제 복잡도에 따라 자유롭게)
+- ★ 각 세그먼트 나레이션은 반드시 20~40자 이내 ★
+  → 나레이션 하나가 짧은 한 문장이 되도록 핵심만 압축
+  → 긴 설명은 여러 세그먼트로 나눔
+- 세그먼트 구성 예시 (8개 기준):
+    0: 호기심 유발 한 문장
+    1: 개념 한 줄 정의
+    2: 작동 원리 장면 1
+    3: 작동 원리 장면 2
+    4: 실생활 예시
+    5: 구체적 수치
+    6: 핵심 요약
+    7: 마무리 한 마디
+- 각 세그먼트 나레이션은 TTS로 읽히는 동안 해당 이미지와 자막이 함께 표시됨
 
 [이미지 프롬프트 작성 규칙 — gpt-image-1 카툰 교육 스타일]
 - 해당 세그먼트 나레이션 내용을 시각적으로 설명하는 교육용 카툰 장면 묘사 (영어)
@@ -34,10 +44,10 @@ PROMPT_TEMPLATE = '''
   예) "주식이란" → colorful stock chart with small investor character looking at rising bars
   예) "인플레이션" → shopping cart overflowing, price tags rising, worried cartoon shopper
   예) "중앙은행" → grand bank building center, gears turning, currency flowing outward
-- 세그먼트 0 (도입): 주제 오브젝트 중앙 + 궁금해하는 캐릭터 or 물음표
-- 세그먼트 3 (정리): 캐릭터가 이해한 표정 + 체크마크 or 상승 그래프
+- 첫 세그먼트(index 0): 주제 오브젝트 + 궁금해하는 캐릭터 or 물음표
+- 마지막 세그먼트: 캐릭터가 이해한 표정 + 체크마크 or 상승 그래프
 
-[출력 형식 — 반드시 아래 JSON만 반환]
+[출력 형식 — 반드시 아래 JSON만 반환, segments 배열 길이는 6~8]
 {{
     "title": "반드시 이 형식 그대로: '주제명' 이란?  예) '금리' 이란?  '인플레이션' 이란?",
     "description": "유튜브 설명문 (150자 이내) — 'nn초', 'X분', '1분 만에', '60초 안에' 등 시간 표현 절대 사용 금지",
@@ -45,23 +55,8 @@ PROMPT_TEMPLATE = '''
     "segments": [
         {{
             "index": 0,
-            "narration": "도입 나레이션 (30~50자, 시청자 호기심 유발)",
-            "dalle_prompt": "flat design illustration of [나레이션 핵심 장면 영어 묘사], pure black background, vibrant colors, no text"
-        }},
-        {{
-            "index": 1,
-            "narration": "핵심 개념 설명 (60~100자)",
-            "dalle_prompt": "flat design illustration of [나레이션 핵심 장면 영어 묘사], pure black background, vibrant colors, no text"
-        }},
-        {{
-            "index": 2,
-            "narration": "실생활 예시나 수치 (60~100자)",
-            "dalle_prompt": "flat design illustration of [나레이션 핵심 장면 영어 묘사], pure black background, vibrant colors, no text"
-        }},
-        {{
-            "index": 3,
-            "narration": "핵심 정리 + 다음 편 예고 (40~60자)",
-            "dalle_prompt": "flat design illustration of [나레이션 핵심 장면 영어 묘사], pure black background, vibrant colors, no text"
+            "narration": "★ 20~40자 한 문장 ★",
+            "image_prompt": "[나레이션 장면을 영어로 묘사한 카툰 이미지 프롬프트]"
         }}
     ]
 }}

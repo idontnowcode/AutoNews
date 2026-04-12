@@ -40,7 +40,7 @@ def generate_all_images(segments: list, out_dir: str) -> list:
     paths = []
     for seg in segments:
         idx    = seg.get('index', len(paths))
-        prompt = seg.get('dalle_prompt', 'abstract finance concept visualization')
+        prompt = seg.get('image_prompt') or seg.get('dalle_prompt', 'abstract finance concept visualization')
         path   = os.path.join(out_dir, f'image_{idx:02d}.png')
         print(f'   이미지 생성 중 [{idx+1}/{len(segments)}]: {prompt[:60]}...')
         generate_slide_image(prompt, path)

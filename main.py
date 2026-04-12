@@ -58,7 +58,7 @@ def main():
 
     # ── 7. DB 저장 ────────────────────────────────────
     print('💾 DB 저장 중...')
-    slide_prompts = [s.get('dalle_prompt', '') for s in segments]
+    slide_prompts = [s.get('image_prompt') or s.get('dalle_prompt', '') for s in segments]
     save_video(topic['id'], video_id, script, slide_prompts)
     mark_done(topic['id'])
     print('   완료!')
