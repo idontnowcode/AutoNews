@@ -412,14 +412,26 @@ function saveConfig() {
 
 function connect() {
   if (!cfg.url || !cfg.key) return;
-  try {
-    sb = window.supabase.createClient(cfg.url, cfg.key);
-    document.getElementById('triggerWrap').style.display = cfg.token ? 'block' : 'none';
-    loadCurriculum();
-    loadHistory();
-  } catch(e) {
-    toast('연결 오류: ' + e.message);
+
+  // Supabase CDN 로드 대기 (최대 5초)
+  var attempts = 0;
+  function tryConnect() {
+    if (typeof window.supabase === 'undefined' || !window.supabase.createClient) {
+      if (++attempts < 50) { setTimeout(tryConnect, 100); return; }
+      toast('Supabase CDN 로드 실패 — 페이지를 새로고침하세요');
+      return;
+    }
+    try {
+      sb = window.supabase.createClient(cfg.url, cfg.key);
+      var tw = document.getElementById('triggerWrap');
+      if (tw) tw.style.display = cfg.token ? 'block' : 'none';
+      loadCurriculum();
+      loadHistory();
+    } catch(e) {
+      toast('연결 오류: ' + e.message);
+    }
   }
+  tryConnect();
 }
 
 // ── 모달 ─────────────────────────────────────────
