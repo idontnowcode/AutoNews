@@ -1,8 +1,14 @@
 import os
 import subprocess
 import glob
-from moviepy.editor import (ImageClip, AudioFileClip,
-                             concatenate_videoclips)
+
+# moviepy v1 / v2 호환 임포트
+try:
+    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
+    MOVIEPY_V2 = False
+except ModuleNotFoundError:
+    from moviepy import ImageClip, AudioFileClip, concatenate_videoclips
+    MOVIEPY_V2 = True
 
 VIDEO_SIZE = (1080, 1920)  # Shorts 세로형
 FPS = 30
@@ -35,13 +41,19 @@ def compose_video(ppt_path: str, audio_path: str, output_path: str) -> str:
 
     clips = []
     for img_path in images:
-        clip = (ImageClip(img_path)
-                .set_duration(per_slide)
-                .resize(VIDEO_SIZE))
+        if MOVIEPY_V2:
+            clip = ImageClip(img_path, duration=per_slide).resized(VIDEO_SIZE)
+        else:
+            clip = (ImageClip(img_path)
+                    .set_duration(per_slide)
+                    .resize(VIDEO_SIZE))
         clips.append(clip)
 
-    final = (concatenate_videoclips(clips, method='compose')
-             .set_audio(audio))
+    if MOVIEPY_V2:
+        final = concatenate_videoclips(clips, method='compose').with_audio(audio)
+    else:
+        final = concatenate_videoclips(clips, method='compose').set_audio(audio)
+
     final.write_videofile(
         output_path,
         fps=FPS,
