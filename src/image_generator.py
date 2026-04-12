@@ -21,7 +21,7 @@ def generate_slide_image(prompt: str, output_path: str) -> str:
     response = client.images.generate(
         model="dall-e-3",
         prompt=full_prompt,
-        size="1024x1792",   # 9:16 세로형
+        size="1024x1024",   # 정사각형 (영상 중앙에 배치)
         quality="standard",
         n=1,
     )

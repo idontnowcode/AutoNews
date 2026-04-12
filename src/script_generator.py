@@ -25,10 +25,14 @@ PROMPT_TEMPLATE = '''
 - 슬라이드 구성: 도입 → 핵심개념 → 예시/수치 → 정리
 - 각 슬라이드 나레이션은 해당 이미지와 함께 표시됨 (TTS 읽는 동안 이미지 유지)
 
-[DALL-E 프롬프트 규칙]
-- 스타일: "flat design illustration, black background, clean infographic,
-  vibrant colors, no text, no letters"
-- 각 슬라이드 내용을 직관적으로 표현
+[DALL-E 프롬프트 작성 규칙]
+- 반드시 해당 세그먼트 나레이션 내용과 직접 연관된 장면을 묘사
+- 스타일 고정: "flat design illustration, pure black background (#000000),
+  vibrant colorful objects, clean and simple, no text, no letters, no numbers"
+- 나레이션에 등장하는 핵심 개념을 시각적 오브젝트로 표현
+  예) "금리가 오르면" → rising arrow with coins and bank building
+  예) "집을 담보로" → house with chain/lock and money bags
+  예) "주식이란" → colorful stock chart with dollar signs floating up
 
 [출력 형식 — 반드시 아래 JSON만 반환]
 {{
@@ -39,22 +43,22 @@ PROMPT_TEMPLATE = '''
         {{
             "index": 0,
             "narration": "도입 나레이션 (30~50자, 시청자 호기심 유발)",
-            "dalle_prompt": "DALL-E 3 prompt in English describing the concept visually"
+            "dalle_prompt": "flat design illustration of [나레이션 핵심 장면 영어 묘사], pure black background, vibrant colors, no text"
         }},
         {{
             "index": 1,
             "narration": "핵심 개념 설명 (60~100자)",
-            "dalle_prompt": "DALL-E 3 prompt in English"
+            "dalle_prompt": "flat design illustration of [나레이션 핵심 장면 영어 묘사], pure black background, vibrant colors, no text"
         }},
         {{
             "index": 2,
             "narration": "실생활 예시나 수치 (60~100자)",
-            "dalle_prompt": "DALL-E 3 prompt in English"
+            "dalle_prompt": "flat design illustration of [나레이션 핵심 장면 영어 묘사], pure black background, vibrant colors, no text"
         }},
         {{
             "index": 3,
             "narration": "핵심 정리 + 다음 편 예고 (40~60자)",
-            "dalle_prompt": "DALL-E 3 prompt in English"
+            "dalle_prompt": "flat design illustration of [나레이션 핵심 장면 영어 묘사], pure black background, vibrant colors, no text"
         }}
     ]
 }}
