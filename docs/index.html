@@ -79,7 +79,7 @@
     </div>
 
     <!-- 다음 차례 -->
-    <div id="nextUpCard" class="next-card p-4 mb-4 hidden">
+    <div id="nextUpCard" class="next-card p-4 mb-4" style="display:none">
       <div class="text-xs font-bold text-yellow-400 mb-1">▶ 다음 차례</div>
       <div id="nextTitle" class="text-base font-bold"></div>
       <div id="nextMeta"  class="text-xs text-gray-400 mt-1"></div>
@@ -97,7 +97,7 @@
   </section>
 
   <!-- ── 영상 요청 탭 ─────────────────────────── -->
-  <section id="tab-request-content" class="hidden">
+  <section id="tab-request-content" style="display:none">
 
     <div class="card p-4 mb-4">
       <div class="text-sm font-bold text-yellow-400 mb-3">✏️ 원하는 주제로 영상 만들기</div>
@@ -138,7 +138,7 @@
         </button>
 
         <!-- 즉시 실행 (GitHub Token 있을 때만 표시) -->
-        <div id="triggerSection" class="hidden">
+        <div id="triggerSection" style="display:none">
           <div class="flex items-center gap-2 my-1">
             <div class="flex-1 h-px bg-white/10"></div>
             <span class="text-xs text-gray-500">또는</span>
@@ -151,7 +151,7 @@
       </div>
     </div>
 
-    <div id="reqResult" class="hidden card p-4 text-center">
+    <div id="reqResult" class="card p-4 text-center" style="display:none">
       <div class="text-2xl mb-2">✅</div>
       <div class="font-bold">요청이 접수되었습니다</div>
       <div class="text-xs text-gray-400 mt-1">다음 스케줄 실행(매일 KST 07:00) 시 생성됩니다</div>
@@ -160,7 +160,7 @@
   </section>
 
   <!-- ── 히스토리 탭 ─────────────────────────── -->
-  <section id="tab-history-content" class="hidden">
+  <section id="tab-history-content" style="display:none">
     <div id="historyList" class="space-y-3">
       <div class="text-center text-gray-500 py-8 text-sm">Supabase 연결 후 표시됩니다</div>
     </div>
@@ -169,7 +169,7 @@
 </main>
 
 <!-- ── 설정 모달 ──────────────────────────────── -->
-<div id="settingsModal" class="modal-bg hidden" onclick="closeSettingsOutside(event)">
+<div id="settingsModal" class="modal-bg" style="display:none" onclick="closeSettingsOutside(event)">
   <div class="modal-box">
     <div class="flex items-center justify-between mb-4">
       <div class="text-base font-bold">⚙️ 설정</div>
@@ -201,7 +201,7 @@
 </div>
 
 <!-- ── 토스트 메시지 ── -->
-<div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50
+<div id="toast" style="display:none" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50
      bg-gray-800 text-white text-sm px-4 py-2 rounded-full shadow-lg border border-white/20"></div>
 
 <script>
@@ -232,14 +232,14 @@ function saveSettings() {
 function initSupabase() {
   if (!cfg.url || !cfg.key) return;
   supabase = window.supabase.createClient(cfg.url, cfg.key);
-  document.getElementById('triggerSection').classList.toggle('hidden', !cfg.ghToken);
+  document.getElementById('triggerSection').style.display = cfg.ghToken ? 'block' : 'none';
 }
 
 // ─── Tabs ───────────────────────────────────────────────
 const TABS = ['curriculum', 'request', 'history'];
 function switchTab(name) {
   TABS.forEach(t => {
-    document.getElementById(`tab-${t}-content`).classList.toggle('hidden', t !== name);
+    document.getElementById(`tab-${t}-content`).style.display = t === name ? 'block' : 'none';
     const btn = document.getElementById(`tab-${t}`);
     btn.classList.toggle('tab-active', t === name);
     btn.classList.toggle('text-gray-400', t !== name);
@@ -278,7 +278,7 @@ async function loadCurriculum() {
   // 다음 차례
   const next = topics.find(t => t.status === 'pending');
   if (next) {
-    document.getElementById('nextUpCard').classList.remove('hidden');
+    document.getElementById('nextUpCard').style.display = 'block';
     document.getElementById('nextTitle').textContent = `'${next.title}' 이란?`;
     document.getElementById('nextMeta').textContent  =
       `${next.category} · ${levelLabel(next.level)} · #${next.order_index}`;
@@ -400,9 +400,9 @@ async function submitTopic(triggerNow = false) {
 
   document.getElementById('reqTitle').value   = '';
   document.getElementById('reqDesc').value    = '';
-  document.getElementById('reqResult').classList.remove('hidden');
+  document.getElementById('reqResult').style.display = 'block';
   showToast(triggerNow ? '요청 + GitHub Actions 실행됨' : '영상 생성 요청 완료');
-  setTimeout(() => document.getElementById('reqResult').classList.add('hidden'), 4000);
+  setTimeout(() => { document.getElementById('reqResult').style.display = 'none'; }, 4000);
   loadCurriculum();
 }
 
@@ -432,9 +432,9 @@ function openSettings() {
   document.getElementById('cfgKey').value     = cfg.key     || '';
   document.getElementById('cfgGhToken').value = cfg.ghToken || '';
   document.getElementById('cfgRepo').value    = cfg.repo    || '';
-  document.getElementById('settingsModal').classList.remove('hidden');
+  document.getElementById('settingsModal').style.display = 'flex';
 }
-function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
+function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
 function closeSettingsOutside(e) {
   if (e.target === document.getElementById('settingsModal')) closeSettings();
 }
@@ -451,9 +451,9 @@ function formatDate(iso) {
 function showToast(msg) {
   const el = document.getElementById('toast');
   el.textContent = msg;
-  el.classList.remove('hidden');
+  el.style.display = 'block';
   clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.add('hidden'), 2500);
+  el._t = setTimeout(() => { el.style.display = 'none'; }, 2500);
 }
 
 // ─── Init ────────────────────────────────────────────────
