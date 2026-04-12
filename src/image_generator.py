@@ -1,34 +1,33 @@
 """
-DALL-E 3로 슬라이드 배경 이미지 생성 (1024×1792 세로형)
+gpt-image-1 (GPT-4o 이미지)로 슬라이드 이미지 생성 (1024×1024)
 """
 import os
-import requests
+import base64
 from openai import OpenAI
 
 client = OpenAI(api_key=os.environ['OPENAI_API_KEY'])
 
 BASE_STYLE = (
-    "bright colorful cartoon illustration, white background, "
-    "vibrant cheerful objects, modern and clean style, "
-    "detailed and lively, no text, no letters, no numbers, no words"
+    "educational cartoon illustration, bright white background, "
+    "colorful cute characters explaining the concept, "
+    "Korean webtoon style, vibrant colors, simple and clear layout, "
+    "no English text, Korean labels are OK if needed"
 )
 
 
 def generate_slide_image(prompt: str, output_path: str) -> str:
-    """DALL-E 3로 이미지 생성 후 로컬 저장"""
+    """gpt-image-1로 이미지 생성 후 로컬 저장 (base64 응답)"""
     full_prompt = f"{prompt}, {BASE_STYLE}"
 
     response = client.images.generate(
-        model="dall-e-3",
+        model="gpt-image-1",
         prompt=full_prompt,
-        size="1024x1024",   # 정사각형 (영상 중앙에 배치)
-        quality="standard",
+        size="1024x1024",
+        quality="medium",
         n=1,
     )
-    image_url = response.data[0].url
 
-    # 다운로드
-    img_data = requests.get(image_url, timeout=30).content
+    img_data = base64.b64decode(response.data[0].b64_json)
     with open(output_path, 'wb') as f:
         f.write(img_data)
 
