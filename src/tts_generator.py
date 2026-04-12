@@ -1,8 +1,6 @@
 import os
 import requests
 
-# ElevenLabs 한국어 지원 Voice ID (변경 가능)
-# 웹사이트에서 직접 들어보고 선택: https://elevenlabs.io/voice-library
 DEFAULT_VOICE_ID = 'pNInz6obpgDQGcFmaJgB'  # Adam (multilingual)
 
 
@@ -24,12 +22,22 @@ def generate_tts(text: str, output_path: str,
             'use_speaker_boost': True
         }
     }
-    key = os.environ['ELEVENLABS_API_KEY']
-    print(f'ElevenLabs 키 앞 10자: {key[:10]}... (길이: {len(key)})')
     resp = requests.post(url, json=payload, headers=headers, timeout=30)
-    if not resp.ok:
-        print(f'ElevenLabs 오류 [{resp.status_code}]: {resp.text}')
     resp.raise_for_status()
     with open(output_path, 'wb') as f:
         f.write(resp.content)
     return output_path
+
+
+def generate_segments_tts(segments: list, out_dir: str) -> list:
+    """세그먼트별 TTS 생성 → [(audio_path, narration), ...] 반환"""
+    os.makedirs(out_dir, exist_ok=True)
+    results = []
+    for seg in segments:
+        idx       = seg['index']
+        narration = seg['narration']
+        path      = os.path.join(out_dir, f'audio_{idx:02d}.mp3')
+        print(f'   TTS [{idx+1}/{len(segments)}]: {narration[:30]}...')
+        generate_tts(narration, path)
+        results.append({'audio_path': path, 'narration': narration, 'index': idx})
+    return results

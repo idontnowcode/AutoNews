@@ -35,15 +35,15 @@ def generate_slide_image(prompt: str, output_path: str) -> str:
     return output_path
 
 
-def generate_all_images(slides: list, out_dir: str) -> list:
-    """슬라이드 리스트에서 dalle_prompt 추출해 전체 이미지 생성"""
+def generate_all_images(segments: list, out_dir: str) -> list:
+    """세그먼트 리스트에서 dalle_prompt 추출해 전체 이미지 생성"""
     os.makedirs(out_dir, exist_ok=True)
     paths = []
-    for slide in slides:
-        idx   = slide.get('index', len(paths))
-        prompt = slide.get('dalle_prompt', 'abstract finance concept visualization')
-        path  = os.path.join(out_dir, f'slide_{idx:02d}.png')
-        print(f'   이미지 생성 중 [{idx+1}/{len(slides)}]: {prompt[:60]}...')
+    for seg in segments:
+        idx    = seg.get('index', len(paths))
+        prompt = seg.get('dalle_prompt', 'abstract finance concept visualization')
+        path   = os.path.join(out_dir, f'image_{idx:02d}.png')
+        print(f'   이미지 생성 중 [{idx+1}/{len(segments)}]: {prompt[:60]}...')
         generate_slide_image(prompt, path)
         paths.append(path)
     return paths
