@@ -26,13 +26,18 @@ PROMPT_TEMPLATE = '''
 - 각 슬라이드 나레이션은 해당 이미지와 함께 표시됨 (TTS 읽는 동안 이미지 유지)
 
 [DALL-E 프롬프트 작성 규칙]
-- 반드시 해당 세그먼트 나레이션 내용과 직접 연관된 장면을 묘사
-- 스타일 고정: "flat design illustration, pure black background (#000000),
-  vibrant colorful objects, clean and simple, no text, no letters, no numbers"
-- 나레이션에 등장하는 핵심 개념을 시각적 오브젝트로 표현
-  예) "금리가 오르면" → rising arrow with coins and bank building
-  예) "집을 담보로" → house with chain/lock and money bags
-  예) "주식이란" → colorful stock chart with dollar signs floating up
+- 해당 세그먼트 나레이션 내용과 직접 연관된 장면 묘사 (영어)
+- 아래 고정 스타일을 반드시 끝에 추가:
+  "flat design illustration, pure black background (#000000), vibrant colorful objects, clean and simple, no text, no letters, no numbers"
+- 나레이션의 핵심 단어를 시각적 오브젝트로 치환
+  예) "금리가 오르면" → upward arrow with percentage sign and stacked coins
+  예) "집을 담보로" → house with chain and padlock attached to money bag
+  예) "주식이란" → colorful rising bar chart with dollar signs floating up
+  예) "인플레이션" → shopping cart overflowing with price tag showing rising arrow
+  예) "중앙은행" → large bank building with gear mechanism
+- 오브젝트 2~4개로 구성, 동작/상태 묘사 포함 (rising, falling, connected, locked 등)
+- 세그먼트 0 (도입): 중앙 오브젝트 + question mark
+- 세그먼트 3 (정리): 오브젝트 + checkmark or upward trend
 
 [출력 형식 — 반드시 아래 JSON만 반환]
 {{

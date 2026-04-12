@@ -24,7 +24,7 @@ C_WHITE  = (255, 255, 255)
 TITLE_TOP    = 120    # 제목 시작 Y (상단 여백 확보)
 IMG_Y        = 360    # 이미지 시작 Y
 IMG_SIZE     = 1080   # 이미지 크기 (정사각형, 1:1)
-SUB_Y        = H - 220  # 자막 Y (하단에서 고정, 한 줄)
+SUB_Y        = H - 340  # 자막 Y (하단에서 고정, 한 줄)
 
 
 def _get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
