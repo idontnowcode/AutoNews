@@ -32,6 +32,12 @@ def _get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
         '/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf' if bold
             else '/usr/share/fonts/truetype/nanum/NanumGothic.ttf',
         '/usr/share/fonts/truetype/nanum/NanumGothic.ttf',
+        '/usr/share/fonts/truetype/nanum/NanumGothicExtraBold.ttf',
+        # Ubuntu 기본 폰트 (한글 미지원이지만 폴백용)
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf' if bold
+            else '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf' if bold
+            else '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
         'C:/Windows/Fonts/malgunbd.ttf' if bold else 'C:/Windows/Fonts/malgun.ttf',
         'C:/Windows/Fonts/malgun.ttf',
         'C:/Windows/Fonts/gulim.ttc',
@@ -39,9 +45,12 @@ def _get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
     for path in candidates:
         if os.path.exists(path):
             try:
-                return ImageFont.truetype(path, size)
+                font = ImageFont.truetype(path, size)
+                print(f'[font] {path} (size={size})')
+                return font
             except Exception:
                 continue
+    print(f'[font] WARNING: no truetype font found for size={size}, using default (text will be tiny!)')
     return ImageFont.load_default()
 
 

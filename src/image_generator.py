@@ -8,9 +8,9 @@ from openai import OpenAI
 client = OpenAI(api_key=os.environ['OPENAI_API_KEY'])
 
 BASE_STYLE = (
-    "minimalist flat design illustration, dark navy blue background (#0D1B3E), "
-    "clean professional finance infographic style, subtle geometric shapes, "
-    "soft glow accents in sky blue and indigo, no text, no letters, no words"
+    "flat design illustration, pure black background (#000000), "
+    "vibrant colorful objects, clean and simple composition, "
+    "no text, no letters, no numbers, no words"
 )
 
 
