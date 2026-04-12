@@ -103,6 +103,32 @@ textarea.form-input{resize:vertical;min-height:72px}
 /* 빈 상태 */
 .empty{text-align:center;padding:40px 20px;color:#555;font-size:13px}
 .empty-icon{font-size:32px;margin-bottom:8px}
+
+/* 비용 탭 */
+.cost-section{padding:16px}
+.cost-card{background:#1a1a2e;border:1px solid #ffffff15;border-radius:12px;padding:16px;margin-bottom:12px}
+.cost-card-title{font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px}
+.cost-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #ffffff08}
+.cost-row:last-child{border-bottom:none}
+.cost-label{font-size:13px;color:#ccc}
+.cost-sub{font-size:11px;color:#555;margin-top:2px}
+.cost-val{font-size:14px;font-weight:700;text-align:right}
+.cost-total-card{background:linear-gradient(135deg,#FFD60A18,#FFD60A08);border:1px solid #FFD60A44;border-radius:12px;padding:16px;margin-bottom:12px;text-align:center}
+.cost-total-label{font-size:12px;color:#888;margin-bottom:4px}
+.cost-total-val{font-size:32px;font-weight:700;color:#FFD60A}
+.cost-total-sub{font-size:11px;color:#666;margin-top:4px}
+.slider-group{margin-bottom:16px}
+.slider-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.slider-name{font-size:13px;color:#ccc}
+.slider-val{font-size:14px;font-weight:700;color:#FFD60A}
+input[type=range]{width:100%;height:4px;border-radius:2px;background:#ffffff20;outline:none;-webkit-appearance:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#FFD60A;cursor:pointer}
+.free-bar-bg{background:#ffffff10;border-radius:4px;height:6px;margin-top:6px}
+.free-bar-fill{height:6px;border-radius:4px;transition:width .3s}
+.tag{display:inline-block;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600}
+.tag-green{background:#16a34a22;color:#4ade80;border:1px solid #16a34a44}
+.tag-orange{background:#d9770622;color:#fb923c;border:1px solid #d9770644}
+.tag-red{background:#dc262622;color:#f87171;border:1px solid #dc262644}
 </style>
 </head>
 <body>
@@ -121,6 +147,7 @@ textarea.form-input{resize:vertical;min-height:72px}
   <button class="tab-btn active" id="tabBtn0" onclick="showTab(0)">📚 커리큘럼</button>
   <button class="tab-btn" id="tabBtn1" onclick="showTab(1)">🎬 영상 요청</button>
   <button class="tab-btn" id="tabBtn2" onclick="showTab(2)">📋 히스토리</button>
+  <button class="tab-btn" id="tabBtn3" onclick="showTab(3)">💰 비용</button>
 </div>
 
 <!-- 탭 0: 커리큘럼 -->
@@ -204,6 +231,125 @@ textarea.form-input{resize:vertical;min-height:72px}
 <div id="tabPane2" style="display:none">
   <div class="card" style="margin:16px" id="historyContainer">
     <div class="empty"><div class="empty-icon">🔌</div>Supabase 연결 후 표시됩니다</div>
+  </div>
+</div>
+
+<!-- 탭 3: 비용 -->
+<div id="tabPane3" style="display:none">
+  <div class="cost-section">
+
+    <!-- 슬라이더 -->
+    <div class="cost-card">
+      <div class="cost-card-title">📊 조건 설정</div>
+      <div class="slider-group">
+        <div class="slider-label">
+          <span class="slider-name">월 영상 수</span>
+          <span class="slider-val" id="lblVideos">30</span>
+        </div>
+        <input type="range" id="slVideos" min="1" max="60" value="30" oninput="calcCost()">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label">
+          <span class="slider-name">세그먼트 수 (영상당)</span>
+          <span class="slider-val" id="lblSegs">7</span>
+        </div>
+        <input type="range" id="slSegs" min="4" max="8" value="7" oninput="calcCost()">
+      </div>
+      <div class="slider-group" style="margin-bottom:0">
+        <div class="slider-label">
+          <span class="slider-name">이미지 품질</span>
+          <span class="slider-val" id="lblQuality">Medium</span>
+        </div>
+        <input type="range" id="slQuality" min="0" max="2" value="1" oninput="calcCost()">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#555;margin-top:4px">
+          <span>Low ($0.011)</span><span>Medium ($0.042)</span><span>High ($0.167)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 영상 1개 비용 -->
+    <div class="cost-total-card">
+      <div class="cost-total-label">영상 1개 예상 비용</div>
+      <div class="cost-total-val" id="totalPerVideo">$0.00</div>
+      <div class="cost-total-sub" id="totalPerVideoSub"></div>
+    </div>
+
+    <!-- API별 상세 (1회) -->
+    <div class="cost-card">
+      <div class="cost-card-title">🔍 API별 단가 (영상 1개)</div>
+      <div class="cost-row">
+        <div><div class="cost-label">🤖 Claude Sonnet</div><div class="cost-sub">스크립트 생성 · ~500 in / ~1,500 out tokens</div></div>
+        <div class="cost-val" id="costClaude" style="color:#a78bfa">$0.00</div>
+      </div>
+      <div class="cost-row">
+        <div><div class="cost-label">🎨 gpt-image-1</div><div class="cost-sub" id="costImgSub">이미지 7장 × $0.042</div></div>
+        <div class="cost-val" id="costImg" style="color:#60a5fa">$0.00</div>
+      </div>
+      <div class="cost-row">
+        <div><div class="cost-label">🔊 ElevenLabs TTS</div><div class="cost-sub" id="costTtsSub">~210자 · Starter $5/30,000자</div></div>
+        <div class="cost-val" id="costTts" style="color:#34d399">$0.00</div>
+      </div>
+    </div>
+
+    <!-- 월간 합계 -->
+    <div class="cost-card">
+      <div class="cost-card-title">📅 월간 예상 비용</div>
+      <div class="cost-row">
+        <div><div class="cost-label">Claude Sonnet</div></div>
+        <div class="cost-val" id="mClaude" style="color:#a78bfa"></div>
+      </div>
+      <div class="cost-row">
+        <div><div class="cost-label">gpt-image-1</div></div>
+        <div class="cost-val" id="mImg" style="color:#60a5fa"></div>
+      </div>
+      <div class="cost-row">
+        <div>
+          <div class="cost-label">ElevenLabs TTS</div>
+          <div style="margin-top:6px">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#555;margin-bottom:3px">
+              <span>무료 한도 사용량</span><span id="ttsBarLabel"></span>
+            </div>
+            <div class="free-bar-bg"><div class="free-bar-fill" id="ttsBar"></div></div>
+            <div style="font-size:10px;color:#555;margin-top:3px">Free tier: 10,000자/월</div>
+          </div>
+        </div>
+        <div class="cost-val" id="mTts" style="color:#34d399"></div>
+      </div>
+      <div class="cost-row" style="border-top:1px solid #FFD60A33;margin-top:4px;padding-top:12px">
+        <div><div class="cost-label" style="font-size:15px;font-weight:700;color:#FFD60A">월 합계</div></div>
+        <div class="cost-val" id="mTotal" style="color:#FFD60A;font-size:18px"></div>
+      </div>
+    </div>
+
+    <!-- 단가 참고 -->
+    <div class="cost-card">
+      <div class="cost-card-title">📌 API 단가 참고</div>
+      <div class="cost-row">
+        <div class="cost-label">Claude Sonnet 4.6</div>
+        <div style="text-align:right;font-size:11px;color:#888">$3 / M input<br>$15 / M output</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-label">gpt-image-1 Low</div>
+        <div style="text-align:right;font-size:12px;color:#888">$0.011 / 장</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-label">gpt-image-1 Medium</div>
+        <div style="text-align:right;font-size:12px;color:#888">$0.042 / 장</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-label">gpt-image-1 High</div>
+        <div style="text-align:right;font-size:12px;color:#888">$0.167 / 장</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-label">ElevenLabs Free</div>
+        <div style="text-align:right;font-size:12px;color:#888">10,000자/월</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-label">ElevenLabs Starter</div>
+        <div style="text-align:right;font-size:12px;color:#888">$5 / 30,000자</div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -293,11 +439,75 @@ function overlayClick(e) {
 
 // ── 탭 ───────────────────────────────────────────
 function showTab(n) {
-  for (var i = 0; i < 3; i++) {
+  for (var i = 0; i < 4; i++) {
     document.getElementById('tabPane' + i).style.display = i === n ? 'block' : 'none';
-    var btn = document.getElementById('tabBtn' + i);
-    btn.className = 'tab-btn' + (i === n ? ' active' : '');
+    document.getElementById('tabBtn' + i).className = 'tab-btn' + (i === n ? ' active' : '');
   }
+  if (n === 3) calcCost();
+}
+
+// ── 비용 계산 ─────────────────────────────────────
+var IMG_PRICES = [0.011, 0.042, 0.167];
+var QUALITY_LABELS = ['Low', 'Medium', 'High'];
+
+function calcCost() {
+  var videos  = parseInt(document.getElementById('slVideos').value);
+  var segs    = parseInt(document.getElementById('slSegs').value);
+  var qIdx    = parseInt(document.getElementById('slQuality').value);
+  var imgPrice = IMG_PRICES[qIdx];
+
+  document.getElementById('lblVideos').textContent  = videos;
+  document.getElementById('lblSegs').textContent    = segs;
+  document.getElementById('lblQuality').textContent = QUALITY_LABELS[qIdx];
+
+  // Claude: 500 input + 1500 output tokens per video
+  var claudePer = (500/1e6)*3 + (1500/1e6)*15;  // ~$0.024
+
+  // gpt-image-1: segs images per video
+  var imgPer = segs * imgPrice;
+
+  // ElevenLabs: avg 30 chars per segment
+  var charsPerVideo = segs * 30;
+  var FREE_LIMIT = 10000;
+  var STARTER_LIMIT = 30000;
+  var monthlyChars = videos * charsPerVideo;
+  var ttsPer, ttsMon;
+  if (monthlyChars <= FREE_LIMIT) {
+    ttsPer = 0; ttsMon = 0;
+  } else if (monthlyChars <= STARTER_LIMIT) {
+    ttsPer = 0; ttsMon = 5;   // Starter plan 고정
+  } else {
+    ttsPer = 0; ttsMon = Math.ceil(monthlyChars / STARTER_LIMIT) * 5;
+  }
+
+  var totalPer = claudePer + imgPer + ttsPer;
+  var mC = claudePer * videos;
+  var mI = imgPer * videos;
+  var mTotal = mC + mI + ttsMon;
+
+  // 단위별 표시
+  document.getElementById('totalPerVideo').textContent = '$' + totalPer.toFixed(3);
+  document.getElementById('totalPerVideoSub').textContent =
+    'Claude + ' + segs + '장 이미지 + TTS';
+
+  document.getElementById('costClaude').textContent   = '$' + claudePer.toFixed(4);
+  document.getElementById('costImg').textContent      = '$' + imgPer.toFixed(3);
+  document.getElementById('costImgSub').textContent   = '이미지 ' + segs + '장 × $' + imgPrice;
+  document.getElementById('costTts').textContent      = ttsPer === 0 ? '$0 (무료)' : '$' + ttsPer.toFixed(3);
+  document.getElementById('costTtsSub').textContent   = '~' + charsPerVideo + '자 · Starter $5/30,000자';
+
+  document.getElementById('mClaude').textContent = '$' + mC.toFixed(2);
+  document.getElementById('mImg').textContent    = '$' + mI.toFixed(2);
+  document.getElementById('mTts').textContent    = ttsMon === 0 ? '$0 (무료 한도 내)' : '$' + ttsMon.toFixed(0) + ' (Starter)';
+  document.getElementById('mTotal').textContent  = '$' + mTotal.toFixed(2);
+
+  // TTS 무료 바
+  var pct = Math.min(monthlyChars / FREE_LIMIT * 100, 100);
+  var bar = document.getElementById('ttsBar');
+  bar.style.width = pct + '%';
+  bar.style.background = pct < 70 ? '#4ade80' : pct < 100 ? '#fb923c' : '#f87171';
+  document.getElementById('ttsBarLabel').textContent =
+    monthlyChars.toLocaleString() + ' / 10,000자' + (monthlyChars > FREE_LIMIT ? ' (초과)' : '');
 }
 
 // ── 커리큘럼 ──────────────────────────────────────
@@ -349,9 +559,13 @@ async function loadCurriculum() {
       var badgeCls = isNext ? 'badge-next' : t.status==='done' ? 'badge-done' : t.status==='in_progress' ? 'badge-progress' : 'badge-pending';
       var badgeTxt = isNext ? '▶ 다음' : t.status==='done' ? '완료' : t.status==='in_progress' ? '진행중' : '대기';
       html += '<div class="topic-row'+(isNext?' next-row':'')+'">';
-      html += '<div><div class="topic-name">'+t.title+'</div><div class="topic-sub">'+lvl(t.level)+' · #'+t.order_index+'</div></div>';
+      html += '<div style="flex:1;min-width:0;margin-right:8px"><div class="topic-name">'+t.title+'</div><div class="topic-sub">'+lvl(t.level)+' · #'+t.order_index+'</div></div>';
+      html += '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">';
+      if (t.status === 'pending' && !isNext) {
+        html += '<button onclick="reserveTopic(\''+t.id+'\',\''+t.title+'\')" style="font-size:11px;padding:3px 8px;background:#ffffff12;border:1px solid #ffffff25;border-radius:6px;color:#ccc;cursor:pointer">📅 예약</button>';
+      }
       html += '<span class="badge '+badgeCls+'">'+badgeTxt+'</span>';
-      html += '</div>';
+      html += '</div></div>';
     });
     html += '</div></div>';
   });
@@ -434,6 +648,20 @@ async function triggerActions() {
   return true;
 }
 
+
+async function reserveTopic(id, title) {
+  if (!sb) { openModal(); return; }
+  var res = await sb.from('topics').update({ order_index: -1 }).eq('id', id);
+  if (res.error) { toast('오류: ' + res.error.message); return; }
+
+  if (cfg.token && cfg.repo) {
+    await triggerActions();
+    toast('⚡ "' + title + '" 예약 + 즉시 실행');
+  } else {
+    toast('📅 "' + title + '" 다음 차례로 예약됨');
+  }
+  loadCurriculum();
+}
 
 async function triggerNext() {
   if (!cfg.token || !cfg.repo) {
