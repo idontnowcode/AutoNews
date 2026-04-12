@@ -18,10 +18,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 시스템 패키지 설치 (FFmpeg)
+      - name: 시스템 패키지 설치 (FFmpeg + 한글 폰트)
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg fonts-nanum
 
       - name: Python 패키지 설치
         run: pip install --no-cache-dir -r requirements.txt
