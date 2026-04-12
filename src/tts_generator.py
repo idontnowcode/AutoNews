@@ -11,8 +11,8 @@ def generate_tts(text: str, output_path: str,
     """ElevenLabs TTS → MP3 파일 저장"""
     url = f'https://api.elevenlabs.io/v1/text-to-speech/{voice_id}'
     headers = {
-        'Authorization': f"Bearer {os.environ['ELEVENLABS_API_KEY']}",
-        'Content-Type':  'application/json',
+        'xi-api-key':   os.environ['ELEVENLABS_API_KEY'],
+        'Content-Type': 'application/json',
     }
     payload = {
         'text': text,
@@ -24,6 +24,8 @@ def generate_tts(text: str, output_path: str,
             'use_speaker_boost': True
         }
     }
+    key = os.environ['ELEVENLABS_API_KEY']
+    print(f'ElevenLabs 키 앞 10자: {key[:10]}... (길이: {len(key)})')
     resp = requests.post(url, json=payload, headers=headers, timeout=30)
     if not resp.ok:
         print(f'ElevenLabs 오류 [{resp.status_code}]: {resp.text}')
