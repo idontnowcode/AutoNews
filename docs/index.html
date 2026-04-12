@@ -250,7 +250,7 @@ function loadCfg() {
   try { cfg = JSON.parse(localStorage.getItem('econ_cfg') || '{}'); } catch(e) { cfg = {}; }
 }
 
-function saveCfg() {
+function saveConfig() {
   cfg = {
     url:   document.getElementById('cfgUrl').value.trim(),
     key:   document.getElementById('cfgKey').value.trim(),
@@ -258,13 +258,10 @@ function saveCfg() {
     repo:  document.getElementById('cfgRepo').value.trim()
   };
   if (!cfg.url || !cfg.key) { toast('URL과 Key는 필수입니다'); return; }
-  localStorage.setItem('econ_cfg', JSON.stringify(cfg));
+  try { localStorage.setItem('econ_cfg', JSON.stringify(cfg)); } catch(e) { /* 샌드박스 환경 무시 */ }
   closeModal();
   connect();
 }
-
-// 이름 충돌 방지용 별도 함수명 사용
-function saveConfig() { saveCfg(); }
 
 function connect() {
   if (!cfg.url || !cfg.key) return;
