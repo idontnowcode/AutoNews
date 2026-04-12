@@ -171,7 +171,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
       <div class="next-badge">▶ 다음 차례</div>
       <div class="next-title" id="nextTitle"></div>
       <div class="next-meta" id="nextMeta"></div>
-      <button onclick="triggerNext()" style="margin-top:12px;width:100%;padding:10px;background:#FFD60A;color:#000;font-weight:700;border-radius:8px;font-size:14px;border:none;cursor:pointer">
+      <button id="nextGenBtn" onclick="triggerNext()" style="margin-top:12px;width:100%;padding:10px;background:#FFD60A;color:#000;font-weight:700;border-radius:8px;font-size:14px;border:none;cursor:pointer">
         ⚡ 이 주제로 즉시 영상 생성
       </button>
     </div>
@@ -206,7 +206,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
         <textarea id="reqDesc" class="form-input" placeholder="어떤 내용을 다뤄야 할지 간단히 적어주세요"></textarea>
       </div>
 
-      <button class="btn-primary" onclick="submitTopic()">⚡ 영상 즉시 생성 요청</button>
+      <button id="submitBtn" class="btn-primary" onclick="submitTopic()">⚡ 영상 즉시 생성 요청</button>
       <div id="noTokenMsg" style="display:none;font-size:11px;color:#fb923c;margin-top:8px;text-align:center">
         ⚠️ GitHub Token 미설정 — 설정에서 입력하면 즉시 실행됩니다 (다음 KST 07:00에 생성)
       </div>
@@ -628,7 +628,82 @@ async function triggerActions() {
     body: JSON.stringify({ref:'main'})
   });
   if (!res.ok) { toast('GitHub 실행 실패: ' + res.status); return false; }
+  setGenerating();
   return true;
+}
+
+// ── 생성 중 상태 관리 ──────────────────────────────
+var GEN_KEY = 'econ_gen';
+var _genPollTimer = null;
+
+function setGenerating() {
+  try { localStorage.setItem(GEN_KEY, JSON.stringify({ at: Date.now() })); } catch(e) {}
+  updateGeneratingUI(true);
+  clearTimeout(_genPollTimer);
+  _genPollTimer = setTimeout(checkGenStatus, 30000);
+}
+
+function clearGenerating() {
+  try { localStorage.removeItem(GEN_KEY); } catch(e) {}
+  clearTimeout(_genPollTimer);
+  updateGeneratingUI(false);
+}
+
+function updateGeneratingUI(on) {
+  var nextBtn   = document.getElementById('nextGenBtn');
+  var submitBtn = document.getElementById('submitBtn');
+  if (nextBtn) {
+    nextBtn.textContent = on ? '🔄 생성 중...' : '⚡ 이 주제로 즉시 영상 생성';
+    nextBtn.disabled    = on;
+    nextBtn.style.opacity = on ? '0.55' : '1';
+    nextBtn.style.cursor  = on ? 'not-allowed' : 'pointer';
+  }
+  if (submitBtn) {
+    submitBtn.textContent = on ? '🔄 생성 중...' : '⚡ 영상 즉시 생성 요청';
+    submitBtn.disabled    = on;
+    submitBtn.style.opacity = on ? '0.55' : '1';
+    submitBtn.style.cursor  = on ? 'not-allowed' : 'pointer';
+  }
+}
+
+async function checkGenStatus() {
+  var genData = null;
+  try { genData = JSON.parse(localStorage.getItem(GEN_KEY) || 'null'); } catch(e) {}
+  if (!genData) return;
+
+  // 20분 초과 시 자동 해제
+  if (Date.now() - genData.at > 20 * 60 * 1000) {
+    clearGenerating();
+    loadHistory();
+    loadCurriculum();
+    toast('✅ 생성 완료 (시간 초과 해제)');
+    return;
+  }
+
+  // GitHub API로 실행 상태 확인
+  if (cfg.token && cfg.repo) {
+    var parts = cfg.repo.split('/');
+    try {
+      var r = await fetch('https://api.github.com/repos/'+parts[0]+'/'+parts[1]+'/actions/workflows/daily_shorts.yml/runs?per_page=1', {
+        headers: { 'Authorization': 'Bearer '+cfg.token, 'Accept': 'application/vnd.github+json' }
+      });
+      if (r.ok) {
+        var data = await r.json();
+        var run = data.workflow_runs && data.workflow_runs[0];
+        if (run && run.status === 'completed') {
+          clearGenerating();
+          loadHistory();
+          loadCurriculum();
+          toast(run.conclusion === 'success' ? '✅ 영상 생성 완료!' : '⚠️ 워크플로우 종료: ' + run.conclusion);
+          return;
+        }
+      }
+    } catch(e) {}
+  }
+
+  // 아직 실행 중 — 30초 후 재확인
+  clearTimeout(_genPollTimer);
+  _genPollTimer = setTimeout(checkGenStatus, 30000);
 }
 
 
@@ -682,6 +757,15 @@ function toast(msg) {
 
 // ── 초기화 ────────────────────────────────────────
 loadCfg();
+// 페이지 로드 시 생성 중 상태 복원
+(function() {
+  var genData = null;
+  try { genData = JSON.parse(localStorage.getItem(GEN_KEY) || 'null'); } catch(e) {}
+  if (genData && Date.now() - genData.at < 20 * 60 * 1000) {
+    updateGeneratingUI(true);
+    _genPollTimer = setTimeout(checkGenStatus, 5000);
+  }
+})();
 if (cfg.url && cfg.key) {
   connect();
 } else {
