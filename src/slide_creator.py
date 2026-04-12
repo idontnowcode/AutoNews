@@ -1,23 +1,24 @@
 """
-Pillow 기반 슬라이드 PNG 직접 생성
-디자인: Breaking News 스타일 (빨강 타이틀 + 투카드 본문)
+Pillow 기반 슬라이드 PNG 생성 — Gamma 스타일
+다크 네이비 배경, 카드 2개, 숫자 강조 슬라이드
 """
 import os
+import math
 from datetime import date
 from PIL import Image, ImageDraw, ImageFont
 
 SLIDE_W, SLIDE_H = 1080, 1920
 
-# 색상
-C_RED       = (220,  40,  40)
-C_RED_DARK  = (180,  20,  20)
-C_YELLOW    = (255, 214,  10)
-C_BLACK     = ( 20,  20,  20)
+# Gamma 색상 팔레트
+C_BG        = ( 13,  27,  62)   # 메인 네이비
+C_BG_LIGHT  = ( 22,  42,  90)   # 살짝 밝은 네이비
+C_CARD      = ( 28,  48, 100)   # 카드 배경
+C_CARD2     = ( 35,  58, 115)   # 카드 호버
 C_WHITE     = (255, 255, 255)
-C_CARD_BG   = (245, 245, 245)
-C_GRAY_BG   = (230, 230, 230)
-C_DARK_PILL = ( 30,  30,  30)
-C_RED_TEXT  = (210,  30,  30)
+C_GRAY      = (160, 180, 220)
+C_ACCENT    = ( 99, 179, 237)   # 연한 파랑 강조
+C_BADGE_BG  = ( 40,  60, 120)
+C_NUM       = (255, 255, 255)   # 숫자 색
 
 
 def _get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
@@ -55,7 +56,7 @@ def _wrap_text(draw, text: str, font, max_width: int) -> list:
 
 
 def _draw_multiline(draw, text: str, x: int, y: int,
-                    max_width: int, font, fill, line_gap: int = 14) -> int:
+                    max_width: int, font, fill, line_gap: int = 16) -> int:
     for line in _wrap_text(draw, text, font, max_width):
         draw.text((x, y), line, font=font, fill=fill)
         bbox = draw.textbbox((0, 0), line, font=font)
@@ -63,125 +64,219 @@ def _draw_multiline(draw, text: str, x: int, y: int,
     return y
 
 
-def _draw_pill(draw, x1, y1, x2, y2, fill, radius=30):
-    draw.rounded_rectangle([(x1, y1), (x2, y2)], radius=radius, fill=fill)
-
-
-def _make_title_slide(title: str) -> Image.Image:
-    img  = Image.new('RGB', (SLIDE_W, SLIDE_H), C_RED)
+def _draw_bg(img: Image.Image):
+    """다크 네이비 그라데이션 배경"""
     draw = ImageDraw.Draw(img)
-
-    # 배경 미묘한 그라데이션 (아래로 살짝 어둡게)
     for i in range(SLIDE_H):
-        ratio = i / SLIDE_H * 0.25
-        r = max(0, C_RED[0] - int(40 * ratio))
-        g = max(0, C_RED[1] - int(10 * ratio))
-        b = max(0, C_RED[2] - int(10 * ratio))
+        t = i / SLIDE_H
+        r = int(C_BG[0] + (C_BG_LIGHT[0] - C_BG[0]) * t * 0.4)
+        g = int(C_BG[1] + (C_BG_LIGHT[1] - C_BG[1]) * t * 0.4)
+        b = int(C_BG[2] + (C_BG_LIGHT[2] - C_BG[2]) * t * 0.4)
         draw.line([(0, i), (SLIDE_W, i)], fill=(r, g, b))
 
-    # BREAKING 뱃지
-    badge_font = _get_font(44, bold=True)
-    badge_text = '⚡ BREAKING'
-    badge_w = int(draw.textlength(badge_text, font=badge_font)) + 60
-    bx = (SLIDE_W - badge_w) // 2
-    _draw_pill(draw, bx, 160, bx + badge_w, 240, C_YELLOW, radius=24)
-    draw.text((bx + 30, 170), badge_text, font=badge_font, fill=C_BLACK)
 
-    # 메인 제목 (큰 흰 텍스트, 마지막 줄 노란색)
-    title_font = _get_font(100, bold=True)
-    pad = 80
-    lines = _wrap_text(draw, title, title_font, SLIDE_W - pad * 2)
+def _draw_geo_deco(draw, area_h: int = 600):
+    """상단 기하학 장식 (X 패턴 + 원)"""
+    # 큰 원 두 개 (반투명 느낌)
+    circle_color = (30, 55, 115)
+    draw.ellipse([(-100, -200), (500, 700)],  fill=circle_color)
+    draw.ellipse([(650, -300), (1250, 550)], fill=circle_color)
 
-    total_h = 0
-    for line in lines:
+    # X 대각선
+    line_color = (40, 70, 140)
+    lw = 18
+    # 좌상→우하
+    draw.line([(80, 0), (580, area_h)],  fill=line_color, width=lw)
+    draw.line([(200, 0), (700, area_h)], fill=line_color, width=lw)
+    # 우상→좌하
+    draw.line([(SLIDE_W - 80,  0), (SLIDE_W - 580, area_h)], fill=line_color, width=lw)
+    draw.line([(SLIDE_W - 200, 0), (SLIDE_W - 700, area_h)], fill=line_color, width=lw)
+
+    # 상단 오버레이 (텍스트 가독성)
+    for i in range(area_h):
+        alpha = int(180 * (i / area_h) ** 1.5)
+        r = int(C_BG[0] + (C_BG_LIGHT[0] - C_BG[0]) * (i / area_h))
+        g = int(C_BG[1] + (C_BG_LIGHT[1] - C_BG[1]) * (i / area_h))
+        b = int(C_BG[2] + (C_BG_LIGHT[2] - C_BG[2]) * (i / area_h))
+        draw.line([(0, i), (SLIDE_W, i)],
+                  fill=(r, g, b, alpha) if False else (r, g, b))
+
+
+def _draw_badge(draw, x: int, y: int, emoji: str, text: str) -> int:
+    """작은 pill 뱃지, 바텀 y 반환"""
+    font = _get_font(34, bold=True)
+    label = f'{emoji} {text}'
+    w = int(draw.textlength(label, font=font)) + 44
+    h = 60
+    draw.rounded_rectangle([(x, y), (x + w, y + h)], radius=16, fill=C_BADGE_BG)
+    draw.text((x + 22, y + 12), label, font=font, fill=C_GRAY)
+    return y + h + 30
+
+
+def _draw_card(draw, x1: int, y1: int, x2: int,
+               title: str, body: str) -> int:
+    """어두운 카드, 바텀 y 반환"""
+    title_font = _get_font(46, bold=True)
+    body_font  = _get_font(40)
+    pad = 44
+
+    # 제목 높이 측정
+    title_lines = _wrap_text(draw, title, title_font, x2 - x1 - pad * 2)
+    title_h = sum(
+        draw.textbbox((0, 0), l, font=title_font)[3] + 10
+        for l in title_lines
+    )
+    body_lines = _wrap_text(draw, body, body_font, x2 - x1 - pad * 2)
+    body_h = sum(
+        draw.textbbox((0, 0), l, font=body_font)[3] + 12
+        for l in body_lines
+    )
+    card_h = pad + title_h + 20 + body_h + pad
+
+    draw.rounded_rectangle([(x1, y1), (x2, y1 + card_h)],
+                            radius=24, fill=C_CARD)
+
+    y = y1 + pad
+    for line in title_lines:
+        draw.text((x1 + pad, y), line, font=title_font, fill=C_WHITE)
         bbox = draw.textbbox((0, 0), line, font=title_font)
-        total_h += (bbox[3] - bbox[1]) + 20
+        y += bbox[3] + 10
+    y += 8
+    for line in body_lines:
+        draw.text((x1 + pad, y), line, font=body_font, fill=C_GRAY)
+        bbox = draw.textbbox((0, 0), line, font=body_font)
+        y += bbox[3] + 12
 
-    y = (SLIDE_H - total_h) // 2 - 100
-    for idx, line in enumerate(lines):
-        color = C_YELLOW if idx == len(lines) - 1 else C_WHITE
-        draw.text((pad, y), line, font=title_font, fill=color)
-        bbox = draw.textbbox((0, 0), line, font=title_font)
-        y += (bbox[3] - bbox[1]) + 20
+    return y1 + card_h
 
-    # 날짜 pill (하단)
-    date_font = _get_font(38, bold=True)
-    date_str = f'● {date.today().strftime("%Y.%m.%d")}  핫뉴스'
-    date_w = int(draw.textlength(date_str, font=date_font)) + 60
-    dx = (SLIDE_W - date_w) // 2
-    _draw_pill(draw, dx, SLIDE_H - 200, dx + date_w, SLIDE_H - 130,
-               C_DARK_PILL, radius=30)
-    draw.text((dx + 30, SLIDE_H - 190), date_str, font=date_font, fill=C_WHITE)
+
+def _make_title_slide(title: str, subtitle: str) -> Image.Image:
+    img  = Image.new('RGB', (SLIDE_W, SLIDE_H), C_BG)
+    _draw_bg(img)
+    draw = ImageDraw.Draw(img)
+
+    # 상단 기하학 장식
+    _draw_geo_deco(draw, area_h=680)
+
+    # 뱃지
+    badge_y = _draw_badge(draw, 60, 730, '🔥', '속보')
+
+    # 메인 제목
+    title_font = _get_font(88, bold=True)
+    y = _draw_multiline(draw, title, 60, badge_y + 10,
+                        SLIDE_W - 120, title_font, C_WHITE, line_gap=20)
+
+    # 서브타이틀
+    sub_font = _get_font(42)
+    y += 30
+    _draw_multiline(draw, subtitle, 60, y,
+                    SLIDE_W - 120, sub_font, C_GRAY, line_gap=16)
+
+    # 하단 스크롤 힌트
+    hint_font = _get_font(36)
+    draw.text((60, SLIDE_H - 120),
+              '👇 스크롤해서 확인하세요', font=hint_font, fill=C_GRAY)
 
     return img
 
 
-def _make_content_slide(slide_data: dict, body2: str, teaser: str) -> Image.Image:
-    img  = Image.new('RGB', (SLIDE_W, SLIDE_H), C_WHITE)
+def _make_card_slide(slide_data: dict) -> Image.Image:
+    """카드 2개 슬라이드"""
+    img  = Image.new('RGB', (SLIDE_W, SLIDE_H), C_BG)
+    _draw_bg(img)
     draw = ImageDraw.Draw(img)
 
-    # 상단 검정 헤더
-    header_h = 170
-    draw.rectangle([(0, 0), (SLIDE_W, header_h)], fill=C_BLACK)
+    _draw_geo_deco(draw, area_h=560)
 
+    # 뱃지
     emoji   = slide_data.get('emoji', '•')
     heading = slide_data.get('heading', '')
-    head_font = _get_font(62, bold=True)
-    head_text = f'{emoji}  {heading}'
-    hw = draw.textlength(head_text, font=head_font)
-    draw.text(((SLIDE_W - hw) // 2, 52), head_text, font=head_font, fill=C_WHITE)
+    badge_y = _draw_badge(draw, 60, 600, emoji, heading)
 
-    # 흰 카드 (본문 1)
-    body_font  = _get_font(52, bold=False)
-    bold_font  = _get_font(52, bold=True)
-    card1_y1, card1_y2 = 220, 760
-    draw.rounded_rectangle([(60, card1_y1), (SLIDE_W - 60, card1_y2)],
-                            radius=28, fill=C_CARD_BG)
+    # 큰 제목
+    title_font = _get_font(78, bold=True)
+    y = _draw_multiline(draw, slide_data.get('title_big', heading),
+                        60, badge_y,
+                        SLIDE_W - 120, title_font, C_WHITE, line_gap=16)
 
-    body1 = slide_data.get('body', '')
-    _draw_multiline(draw, body1, 100, card1_y1 + 60,
-                    SLIDE_W - 260, body_font, C_BLACK, line_gap=22)
+    y += 50
+    # 카드 1
+    c1 = slide_data.get('card1', {})
+    y = _draw_card(draw, 60, y, SLIDE_W - 60,
+                   c1.get('title', ''), c1.get('body', ''))
+    y += 30
+    # 카드 2
+    c2 = slide_data.get('card2', {})
+    _draw_card(draw, 60, y, SLIDE_W - 60,
+               c2.get('title', ''), c2.get('body', ''))
 
-    # 카드 우측 이모지 (크게)
-    em_font = _get_font(90)
-    draw.text((SLIDE_W - 200, card1_y2 - 160), emoji, font=em_font, fill=C_BLACK)
+    return img
 
-    # 노란 카드 (본문 2 — 핵심 임팩트)
-    card2_y1, card2_y2 = 820, 1440
-    draw.rounded_rectangle([(60, card2_y1), (SLIDE_W - 60, card2_y2)],
-                            radius=28, fill=C_YELLOW)
 
-    _draw_multiline(draw, body2, 100, card2_y1 + 60,
-                    SLIDE_W - 260, bold_font, C_BLACK, line_gap=22)
+def _make_stat_slide(slide_data: dict) -> Image.Image:
+    """숫자 강조 슬라이드"""
+    img  = Image.new('RGB', (SLIDE_W, SLIDE_H), C_BG)
+    _draw_bg(img)
+    draw = ImageDraw.Draw(img)
 
-    # 하단 dark pill (티저 문구)
-    teaser_font = _get_font(38, bold=True)
-    teaser_w = int(draw.textlength(teaser, font=teaser_font)) + 60
-    tx = (SLIDE_W - teaser_w) // 2
-    _draw_pill(draw, tx, SLIDE_H - 200, tx + teaser_w, SLIDE_H - 120,
-               C_DARK_PILL, radius=30)
-    draw.text((tx + 30, SLIDE_H - 194), teaser, font=teaser_font, fill=C_WHITE)
+    # 뱃지 + 제목
+    emoji   = slide_data.get('emoji', '•')
+    heading = slide_data.get('heading', '')
+    badge_y = _draw_badge(draw, 60, 160, emoji, heading)
+
+    title_font = _get_font(78, bold=True)
+    y = _draw_multiline(draw, slide_data.get('title_big', heading),
+                        60, badge_y,
+                        SLIDE_W - 120, title_font, C_WHITE, line_gap=16)
+
+    y += 80
+    # 통계 2개
+    for stat in slide_data.get('stats', [])[:2]:
+        # 큰 숫자
+        num_font = _get_font(160, bold=True)
+        num = stat.get('number', '')
+        nw  = draw.textlength(num, font=num_font)
+        draw.text(((SLIDE_W - nw) // 2, y), num, font=num_font, fill=C_WHITE)
+        bbox = draw.textbbox((0, 0), num, font=num_font)
+        y += bbox[3] + 10
+
+        # 레이블 (굵음)
+        label_font = _get_font(46, bold=True)
+        lw = draw.textlength(stat.get('label', ''), font=label_font)
+        draw.text(((SLIDE_W - lw) // 2, y),
+                  stat.get('label', ''), font=label_font, fill=C_ACCENT)
+        y += 56
+
+        # 설명
+        desc_font = _get_font(38)
+        dw = draw.textlength(stat.get('desc', ''), font=desc_font)
+        draw.text(((SLIDE_W - dw) // 2, y),
+                  stat.get('desc', ''), font=desc_font, fill=C_GRAY)
+        y += 100
 
     return img
 
 
 def create_slides(script_data: dict, out_dir: str) -> list:
-    """슬라이드 PNG 생성 → 파일 경로 리스트 반환"""
     os.makedirs(out_dir, exist_ok=True)
-    slides = script_data.get('slides', [])[:3]
+    slides = script_data.get('slides', [])
     paths  = []
 
-    # 타이틀 슬라이드
+    # 타이틀
     p = os.path.join(out_dir, 'slide_00.png')
-    _make_title_slide(script_data['title']).save(p)
+    _make_title_slide(
+        script_data['title'],
+        script_data.get('subtitle', script_data.get('description', ''))
+    ).save(p)
     paths.append(p)
 
-    # 본문 슬라이드 — slides에 body2, teaser 필드 활용 (없으면 fallback)
-    for i, s in enumerate(slides, 1):
-        body2  = s.get('body2',  s.get('body', ''))
-        teaser = s.get('teaser', '')
+    # 본문
+    for i, s in enumerate(slides[:3], 1):
         p = os.path.join(out_dir, f'slide_{i:02d}.png')
-        _make_content_slide(s, body2, teaser).save(p)
+        if s.get('type') == 'stat':
+            _make_stat_slide(s).save(p)
+        else:
+            _make_card_slide(s).save(p)
         paths.append(p)
 
     return paths
