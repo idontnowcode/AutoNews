@@ -1,6 +1,4 @@
 import os
-import subprocess
-import glob
 
 # moviepy v1 / v2 호환 임포트
 try:
@@ -14,33 +12,17 @@ VIDEO_SIZE = (1080, 1920)  # Shorts 세로형
 FPS = 30
 
 
-def ppt_to_images(ppt_path: str, out_dir: str) -> list:
-    """LibreOffice: PPT → PNG 이미지 변환"""
-    os.makedirs(out_dir, exist_ok=True)
-    env = {**os.environ, 'HOME': '/root', 'DISPLAY': ''}
-    subprocess.run([
-        'libreoffice', '--headless',
-        '--convert-to', 'png',
-        '--outdir', out_dir,
-        ppt_path
-    ], check=True, capture_output=True, env=env)
-    images = sorted(glob.glob(os.path.join(out_dir, '*.png')))
-    return images
-
-
-def compose_video(ppt_path: str, audio_path: str, output_path: str) -> str:
-    """슬라이드 + 오디오 → MP4 영상"""
-    img_dir = output_path.replace('.mp4', '_slides')
-    images  = ppt_to_images(ppt_path, img_dir)
-    if not images:
-        raise ValueError('슬라이드 이미지 변환 실패')
+def compose_video(image_paths: list, audio_path: str, output_path: str) -> str:
+    """슬라이드 PNG 리스트 + 오디오 → MP4 영상"""
+    if not image_paths:
+        raise ValueError('슬라이드 이미지가 없음')
 
     audio     = AudioFileClip(audio_path)
     duration  = audio.duration
-    per_slide = duration / len(images)
+    per_slide = duration / len(image_paths)
 
     clips = []
-    for img_path in images:
+    for img_path in image_paths:
         if MOVIEPY_V2:
             clip = ImageClip(img_path, duration=per_slide).resized(VIDEO_SIZE)
         else:
