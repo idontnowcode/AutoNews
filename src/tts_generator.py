@@ -11,7 +11,6 @@ def generate_tts(text: str, output_path: str,
     """ElevenLabs TTS → MP3 파일 저장"""
     url = f'https://api.elevenlabs.io/v1/text-to-speech/{voice_id}'
     headers = {
-        'xi-api-key':    os.environ['ELEVENLABS_API_KEY'],
         'Authorization': f"Bearer {os.environ['ELEVENLABS_API_KEY']}",
         'Content-Type':  'application/json',
     }
