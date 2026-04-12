@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>경제 Shorts 대시보드</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: -apple-system, 'Malgun Gothic', sans-serif; }
+    .tab-active { border-bottom: 3px solid #FFD60A; color: #FFD60A; }
+    .status-done    { background: #16a34a22; color: #4ade80; border: 1px solid #16a34a55; }
+    .status-progress{ background: #d9770622; color: #fb923c; border: 1px solid #d9770655; }
+    .status-pending { background: #ffffff11; color: #9ca3af; border: 1px solid #ffffff22; }
+    .status-next    { background: #FFD60A22; color: #FFD60A; border: 1px solid #FFD60A55; }
+    .card { background: #1a1a2e; border: 1px solid #ffffff15; border-radius: 12px; }
+    .input-base { background: #1a1a2e; border: 1px solid #ffffff25; border-radius: 8px;
+                  color: white; padding: 10px 14px; width: 100%; outline: none; }
+    .input-base:focus { border-color: #FFD60A88; }
+    .btn-primary { background: #FFD60A; color: #000; font-weight: 700;
+                   border-radius: 8px; padding: 12px; width: 100%; font-size: 16px; }
+    .btn-secondary { background: #ffffff15; color: #fff; border-radius: 8px;
+                     padding: 10px; width: 100%; font-size: 14px; }
+    .next-card { background: linear-gradient(135deg, #FFD60A18, #FFD60A08);
+                 border: 1px solid #FFD60A55; border-radius: 12px; }
+    .modal-bg { background: rgba(0,0,0,0.85); position: fixed; inset: 0; z-index: 50;
+                display: flex; align-items: flex-end; }
+    .modal-box { background: #12121f; border-radius: 20px 20px 0 0; width: 100%;
+                 padding: 24px; border: 1px solid #ffffff15; max-height: 90vh; overflow-y: auto; }
+    .pill { display: inline-flex; align-items: center; gap: 4px;
+            padding: 2px 8px; border-radius: 9999px; font-size: 12px; font-weight: 600; }
+    select option { background: #1a1a2e; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #ffffff30; border-radius: 9999px; }
+  </style>
+</head>
+<body class="bg-gray-950 text-white min-h-screen pb-8">
+
+<!-- 헤더 -->
+<header class="sticky top-0 z-40 bg-gray-950 border-b border-white/10 px-4 py-3 flex items-center justify-between">
+  <div>
+    <div class="text-lg font-bold text-yellow-400">경제 Shorts</div>
+    <div id="headerSub" class="text-xs text-gray-500">로딩 중...</div>
+  </div>
+  <button onclick="openSettings()" class="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-lg">⚙️</button>
+</header>
+
+<!-- 탭 -->
+<nav class="flex border-b border-white/10 bg-gray-950 sticky top-[60px] z-30">
+  <button onclick="switchTab('curriculum')" id="tab-curriculum"
+          class="flex-1 py-3 text-sm font-semibold text-center tab-active">📚 커리큘럼</button>
+  <button onclick="switchTab('request')"   id="tab-request"
+          class="flex-1 py-3 text-sm font-semibold text-center text-gray-400">🎬 영상 요청</button>
+  <button onclick="switchTab('history')"   id="tab-history"
+          class="flex-1 py-3 text-sm font-semibold text-center text-gray-400">📋 히스토리</button>
+</nav>
+
+<!-- 콘텐츠 -->
+<main class="px-4 pt-4">
+
+  <!-- ── 커리큘럼 탭 ─────────────────────────── -->
+  <section id="tab-curriculum-content">
+
+    <!-- 진행률 카드 -->
+    <div class="card p-4 mb-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-sm font-semibold text-gray-300">전체 진행률</span>
+        <span id="progressText" class="text-sm font-bold text-yellow-400">-/-</span>
+      </div>
+      <div class="w-full bg-white/10 rounded-full h-2.5 mb-3">
+        <div id="progressBar" class="bg-yellow-400 h-2.5 rounded-full transition-all duration-500" style="width:0%"></div>
+      </div>
+      <div class="grid grid-cols-3 gap-2 text-center text-xs">
+        <div><div id="cntDone" class="text-lg font-bold text-green-400">-</div><div class="text-gray-500">완료</div></div>
+        <div><div id="cntProgress" class="text-lg font-bold text-orange-400">-</div><div class="text-gray-500">진행중</div></div>
+        <div><div id="cntPending" class="text-lg font-bold text-gray-400">-</div><div class="text-gray-500">대기</div></div>
+      </div>
+    </div>
+
+    <!-- 다음 차례 -->
+    <div id="nextUpCard" class="next-card p-4 mb-4 hidden">
+      <div class="text-xs font-bold text-yellow-400 mb-1">▶ 다음 차례</div>
+      <div id="nextTitle" class="text-base font-bold"></div>
+      <div id="nextMeta"  class="text-xs text-gray-400 mt-1"></div>
+    </div>
+
+    <!-- 카테고리별 목록 -->
+    <div id="topicList" class="space-y-3">
+      <div class="text-center text-gray-500 py-8">
+        <div class="text-2xl mb-2">🔌</div>
+        <div class="text-sm">Supabase 연결이 필요합니다</div>
+        <button onclick="openSettings()" class="mt-3 text-yellow-400 text-sm underline">설정 열기</button>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ── 영상 요청 탭 ─────────────────────────── -->
+  <section id="tab-request-content" class="hidden">
+
+    <div class="card p-4 mb-4">
+      <div class="text-sm font-bold text-yellow-400 mb-3">✏️ 원하는 주제로 영상 만들기</div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block">주제명 *</label>
+          <input id="reqTitle" type="text" placeholder="예) 복리, 달러 환율, 부동산 PF" class="input-base">
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block">카테고리</label>
+          <select id="reqCategory" class="input-base">
+            <option value="거시경제">거시경제</option>
+            <option value="투자">투자</option>
+            <option value="금융시장">금융시장</option>
+            <option value="재정">재정</option>
+            <option value="국제경제">국제경제</option>
+            <option value="행동경제학">행동경제학</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block">난이도</label>
+          <select id="reqLevel" class="input-base">
+            <option value="basic">기초</option>
+            <option value="intermediate">중급</option>
+            <option value="advanced">심화</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block">설명 (선택)</label>
+          <textarea id="reqDesc" placeholder="어떤 내용을 다뤄야 할지 간단히 적어주세요" rows="3"
+                    class="input-base resize-none"></textarea>
+        </div>
+
+        <button onclick="submitTopic()" class="btn-primary">
+          📌 영상 생성 요청
+        </button>
+
+        <!-- 즉시 실행 (GitHub Token 있을 때만 표시) -->
+        <div id="triggerSection" class="hidden">
+          <div class="flex items-center gap-2 my-1">
+            <div class="flex-1 h-px bg-white/10"></div>
+            <span class="text-xs text-gray-500">또는</span>
+            <div class="flex-1 h-px bg-white/10"></div>
+          </div>
+          <button onclick="submitAndTrigger()" class="btn-secondary">
+            ⚡ 요청 + 즉시 GitHub Actions 실행
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="reqResult" class="hidden card p-4 text-center">
+      <div class="text-2xl mb-2">✅</div>
+      <div class="font-bold">요청이 접수되었습니다</div>
+      <div class="text-xs text-gray-400 mt-1">다음 스케줄 실행(매일 KST 07:00) 시 생성됩니다</div>
+    </div>
+
+  </section>
+
+  <!-- ── 히스토리 탭 ─────────────────────────── -->
+  <section id="tab-history-content" class="hidden">
+    <div id="historyList" class="space-y-3">
+      <div class="text-center text-gray-500 py-8 text-sm">Supabase 연결 후 표시됩니다</div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── 설정 모달 ──────────────────────────────── -->
+<div id="settingsModal" class="modal-bg hidden" onclick="closeSettingsOutside(event)">
+  <div class="modal-box">
+    <div class="flex items-center justify-between mb-4">
+      <div class="text-base font-bold">⚙️ 설정</div>
+      <button onclick="closeSettings()" class="text-gray-400 text-xl">✕</button>
+    </div>
+
+    <div class="space-y-4">
+      <div>
+        <label class="text-xs text-gray-400 mb-1 block">Supabase URL *</label>
+        <input id="cfgUrl" type="url" placeholder="https://xxxx.supabase.co" class="input-base text-sm">
+      </div>
+      <div>
+        <label class="text-xs text-gray-400 mb-1 block">Supabase Anon Key *</label>
+        <input id="cfgKey" type="password" placeholder="eyJhb..." class="input-base text-sm">
+      </div>
+      <div>
+        <label class="text-xs text-gray-400 mb-1 block">GitHub Token (즉시 실행용, 선택)</label>
+        <input id="cfgGhToken" type="password" placeholder="ghp_..." class="input-base text-sm">
+        <div class="text-xs text-gray-500 mt-1">workflow 권한 필요 · 입력 시 즉시 실행 버튼 활성화</div>
+      </div>
+      <div>
+        <label class="text-xs text-gray-400 mb-1 block">GitHub 저장소 (owner/repo)</label>
+        <input id="cfgRepo" type="text" placeholder="username/AutoNews" class="input-base text-sm">
+      </div>
+
+      <button onclick="saveSettings()" class="btn-primary mt-2">저장 및 연결</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 토스트 메시지 ── -->
+<div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50
+     bg-gray-800 text-white text-sm px-4 py-2 rounded-full shadow-lg border border-white/20"></div>
+
+<script>
+// ─── Config ────────────────────────────────────────────
+let supabase = null;
+let cfg = {};
+
+function loadConfig() {
+  try {
+    cfg = JSON.parse(localStorage.getItem('shorts_cfg') || '{}');
+  } catch { cfg = {}; }
+}
+
+function saveSettings() {
+  cfg = {
+    url:     document.getElementById('cfgUrl').value.trim(),
+    key:     document.getElementById('cfgKey').value.trim(),
+    ghToken: document.getElementById('cfgGhToken').value.trim(),
+    repo:    document.getElementById('cfgRepo').value.trim(),
+  };
+  if (!cfg.url || !cfg.key) { showToast('URL과 Key는 필수입니다'); return; }
+  localStorage.setItem('shorts_cfg', JSON.stringify(cfg));
+  initSupabase();
+  closeSettings();
+  loadAll();
+}
+
+function initSupabase() {
+  if (!cfg.url || !cfg.key) return;
+  supabase = window.supabase.createClient(cfg.url, cfg.key);
+  document.getElementById('triggerSection').classList.toggle('hidden', !cfg.ghToken);
+}
+
+// ─── Tabs ───────────────────────────────────────────────
+const TABS = ['curriculum', 'request', 'history'];
+function switchTab(name) {
+  TABS.forEach(t => {
+    document.getElementById(`tab-${t}-content`).classList.toggle('hidden', t !== name);
+    const btn = document.getElementById(`tab-${t}`);
+    btn.classList.toggle('tab-active', t === name);
+    btn.classList.toggle('text-gray-400', t !== name);
+  });
+  if (name === 'history') loadHistory();
+}
+
+// ─── Data ───────────────────────────────────────────────
+async function loadAll() {
+  if (!supabase) return;
+  await Promise.all([loadCurriculum(), loadHistory()]);
+}
+
+async function loadCurriculum() {
+  if (!supabase) return;
+  const { data: topics, error } = await supabase
+    .from('topics')
+    .select('id, title, category, level, status, order_index')
+    .order('order_index', { ascending: true });
+
+  if (error) { showToast('DB 오류: ' + error.message); return; }
+
+  const done     = topics.filter(t => t.status === 'done').length;
+  const inProg   = topics.filter(t => t.status === 'in_progress').length;
+  const pending  = topics.filter(t => t.status === 'pending').length;
+  const total    = topics.length;
+  const pct      = total ? Math.round(done / total * 100) : 0;
+
+  document.getElementById('progressText').textContent = `${done} / ${total}`;
+  document.getElementById('progressBar').style.width  = pct + '%';
+  document.getElementById('cntDone').textContent      = done;
+  document.getElementById('cntProgress').textContent  = inProg;
+  document.getElementById('cntPending').textContent   = pending;
+  document.getElementById('headerSub').textContent    = `진행률 ${pct}% · 총 ${total}개 주제`;
+
+  // 다음 차례
+  const next = topics.find(t => t.status === 'pending');
+  if (next) {
+    document.getElementById('nextUpCard').classList.remove('hidden');
+    document.getElementById('nextTitle').textContent = `'${next.title}' 이란?`;
+    document.getElementById('nextMeta').textContent  =
+      `${next.category} · ${levelLabel(next.level)} · #${next.order_index}`;
+  }
+
+  // 카테고리별 그룹
+  const groups = {};
+  topics.forEach(t => {
+    if (!groups[t.category]) groups[t.category] = [];
+    groups[t.category].push(t);
+  });
+
+  const container = document.getElementById('topicList');
+  container.innerHTML = '';
+
+  for (const [cat, items] of Object.entries(groups)) {
+    const catDone    = items.filter(i => i.status === 'done').length;
+    const groupEl    = document.createElement('div');
+    groupEl.className = 'card overflow-hidden';
+    groupEl.innerHTML = `
+      <button onclick="toggleGroup('grp-${cat}')"
+              class="w-full flex items-center justify-between px-4 py-3 text-left">
+        <div>
+          <span class="font-semibold text-sm">${cat}</span>
+          <span class="text-xs text-gray-400 ml-2">${catDone}/${items.length}</span>
+        </div>
+        <svg id="arrow-${cat}" class="w-4 h-4 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+      <div id="grp-${cat}" class="divide-y divide-white/5">
+        ${items.map(t => topicRow(t, next)).join('')}
+      </div>`;
+    container.appendChild(groupEl);
+  }
+}
+
+function topicRow(t, next) {
+  const isNext = next && t.id === next.id;
+  const statusClass = isNext ? 'status-next' :
+                      t.status === 'done'        ? 'status-done' :
+                      t.status === 'in_progress' ? 'status-progress' : 'status-pending';
+  const statusLabel = isNext        ? '▶ 다음' :
+                      t.status === 'done'        ? '완료' :
+                      t.status === 'in_progress' ? '진행중' : '대기';
+  return `
+    <div class="flex items-center justify-between px-4 py-2.5 ${isNext ? 'bg-yellow-400/5' : ''}">
+      <div class="flex-1 min-w-0 mr-3">
+        <div class="text-sm font-medium truncate">${t.title}</div>
+        <div class="text-xs text-gray-500">${levelLabel(t.level)} · #${t.order_index}</div>
+      </div>
+      <span class="pill ${statusClass} shrink-0">${statusLabel}</span>
+    </div>`;
+}
+
+function toggleGroup(id) {
+  const el    = document.getElementById(id);
+  const cat   = id.replace('grp-', '');
+  const arrow = document.getElementById('arrow-' + cat);
+  const hidden = el.classList.toggle('hidden');
+  arrow.style.transform = hidden ? 'rotate(-90deg)' : '';
+}
+
+async function loadHistory() {
+  if (!supabase) return;
+  const { data: videos, error } = await supabase
+    .from('videos')
+    .select('id, title, youtube_id, created_at, topic_id')
+    .order('created_at', { ascending: false })
+    .limit(30);
+
+  if (error) return;
+
+  const container = document.getElementById('historyList');
+  if (!videos || videos.length === 0) {
+    container.innerHTML = '<div class="text-center text-gray-500 py-8 text-sm">아직 생성된 영상이 없습니다</div>';
+    return;
+  }
+
+  container.innerHTML = videos.map(v => `
+    <a href="https://youtube.com/shorts/${v.youtube_id}" target="_blank"
+       class="card flex items-center gap-3 p-3 active:bg-white/5">
+      <img src="https://i.ytimg.com/vi/${v.youtube_id}/mqdefault.jpg"
+           class="w-20 h-14 object-cover rounded-lg bg-gray-800 shrink-0"
+           onerror="this.style.display='none'">
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-semibold truncate">${v.title || '제목 없음'}</div>
+        <div class="text-xs text-gray-400 mt-0.5">${formatDate(v.created_at)}</div>
+        <div class="text-xs text-yellow-400 mt-0.5">▶ YouTube Shorts</div>
+      </div>
+    </a>`).join('');
+}
+
+// ─── Topic Submit ────────────────────────────────────────
+async function submitTopic(triggerNow = false) {
+  if (!supabase) { openSettings(); return; }
+  const title = document.getElementById('reqTitle').value.trim();
+  if (!title)   { showToast('주제명을 입력하세요'); return; }
+
+  const { data: maxRow } = await supabase
+    .from('topics').select('order_index').order('order_index', { ascending: false }).limit(1);
+  const nextIdx = maxRow && maxRow.length ? maxRow[0].order_index + 1 : 100;
+
+  const { error } = await supabase.from('topics').insert({
+    title:       title,
+    title_en:    title,
+    category:    document.getElementById('reqCategory').value,
+    level:       document.getElementById('reqLevel').value,
+    description: document.getElementById('reqDesc').value.trim() || `${title}에 대한 경제 교육 콘텐츠`,
+    status:      'pending',
+    order_index: nextIdx,
+    prerequisites: [],
+    related_topics: [],
+  });
+
+  if (error) { showToast('오류: ' + error.message); return; }
+
+  if (triggerNow) await triggerGitHubActions();
+
+  document.getElementById('reqTitle').value   = '';
+  document.getElementById('reqDesc').value    = '';
+  document.getElementById('reqResult').classList.remove('hidden');
+  showToast(triggerNow ? '요청 + GitHub Actions 실행됨' : '영상 생성 요청 완료');
+  setTimeout(() => document.getElementById('reqResult').classList.add('hidden'), 4000);
+  loadCurriculum();
+}
+
+async function submitAndTrigger() { await submitTopic(true); }
+
+async function triggerGitHubActions() {
+  if (!cfg.ghToken || !cfg.repo) { showToast('GitHub 설정이 필요합니다'); return; }
+  const [owner, repo] = cfg.repo.split('/');
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/actions/workflows/daily_shorts.yml/dispatches`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${cfg.ghToken}`,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ref: 'main' }),
+    }
+  );
+  if (!res.ok) showToast('GitHub 실행 실패: ' + res.status);
+}
+
+// ─── Settings Modal ──────────────────────────────────────
+function openSettings() {
+  document.getElementById('cfgUrl').value     = cfg.url     || '';
+  document.getElementById('cfgKey').value     = cfg.key     || '';
+  document.getElementById('cfgGhToken').value = cfg.ghToken || '';
+  document.getElementById('cfgRepo').value    = cfg.repo    || '';
+  document.getElementById('settingsModal').classList.remove('hidden');
+}
+function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
+function closeSettingsOutside(e) {
+  if (e.target === document.getElementById('settingsModal')) closeSettings();
+}
+
+// ─── Utils ───────────────────────────────────────────────
+function levelLabel(l) {
+  return l === 'basic' ? '기초' : l === 'intermediate' ? '중급' : '심화';
+}
+function formatDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+}
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.add('hidden'), 2500);
+}
+
+// ─── Init ────────────────────────────────────────────────
+loadConfig();
+initSupabase();
+if (cfg.url && cfg.key) loadAll();
+else openSettings();
+</script>
+</body>
+</html>

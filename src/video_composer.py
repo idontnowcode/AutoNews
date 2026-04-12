@@ -106,11 +106,11 @@ def make_frame(title: str, image_path: str, narration: str,
         draw.rectangle([(0, IMG_Y), (W, IMG_Y + IMG_SIZE)], fill=C_BLACK)
 
     # ── 하단: 흰 나레이션 자막 (최대 3줄, 하단 고정) ────
-    sub_font = _get_font(58, bold=True)
+    sub_font = _get_font(62, bold=True)
     lines    = _wrap_text(draw, narration, sub_font, W - pad * 2)[:3]
     line_h   = sub_font.getbbox('가')[3] + 14   # 줄 높이 + 간격
     total_h  = line_h * len(lines)
-    y = H - 60 - total_h                        # 하단 60px 여백 기준 위로
+    y = H - 200 - total_h                       # 하단 200px 여백 (약 2줄 위로)
     for line in lines:
         lw = draw.textlength(line, font=sub_font)
         draw.text(((W - lw) // 2, y), line, font=sub_font, fill=C_WHITE)
