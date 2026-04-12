@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/admin/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/1644cc49-78c2-4a8a-99cd-ada283d3d82b/235abd7a-34de-4283-a9df-742c9bc32b13/skills/docx/**)",
+      "Bash(python scripts/office/unpack.py \"C:\\\\Users\\\\admin\\\\Desktop\\\\AI_Based_Projects\\\\1_Youtube_Shorts_Knowledge\\\\유튜브 쇼츠 영상 자동화 프로젝트\\\\YouTube_Shorts_구현가이드.docx\" /tmp/docx_unpacked/)",
+      "Bash(pandoc \"C:\\\\Users\\\\admin\\\\Desktop\\\\AI_Based_Projects\\\\1_Youtube_Shorts_Knowledge\\\\유튜브 쇼츠 영상 자동화 프로젝트\\\\YouTube_Shorts_구현가이드.docx\" -o /tmp/guide.md)",
+      "Read(//tmp/**)",
+      "Bash(pip install:*)",
+      "Bash(python3 -c ':*)",
+      "Bash(python -c ':*)",
+      "Bash(python -c \"import tempfile; print\\(tempfile.gettempdir\\(\\)\\)\")",
+      "Bash(python scripts/office/unpack.py \"C:\\\\Users\\\\admin\\\\Desktop\\\\AI_Based_Projects\\\\1_Youtube_Shorts_Knowledge\\\\유튜브 쇼츠 영상 자동화 프로젝트\\\\YouTube_Shorts_구현가이드.docx\" \"C:\\\\Users\\\\admin\\\\AppData\\\\Local\\\\Temp\\\\docx_unpacked\\\\\\\\\")"
+    ]
+  }
+}

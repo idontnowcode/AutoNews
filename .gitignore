@@ -1,0 +1,23 @@
+# 환경 변수
+.env
+
+# YouTube OAuth 인증 파일 (민감 정보)
+credentials.json
+token.json
+client_secret_*.json
+
+# 출력 파일 (임시)
+output/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/

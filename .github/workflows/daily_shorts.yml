@@ -1,0 +1,46 @@
+name: YouTube Shorts 자동 업로드
+
+on:
+  schedule:
+    - cron: '0 22 * * *'   # UTC 22:00 = KST 07:00
+  workflow_dispatch:         # 수동 실행 버튼 활성화
+
+jobs:
+  create-and-upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 설정
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 시스템 패키지 설치 (LibreOffice, FFmpeg)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y libreoffice ffmpeg
+
+      - name: Python 패키지 설치
+        run: pip install -r requirements.txt
+
+      - name: 파이프라인 실행
+        env:
+          NAVER_CLIENT_ID:     ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+          TAVILY_API_KEY:      ${{ secrets.TAVILY_API_KEY }}
+          ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
+          ELEVENLABS_API_KEY:  ${{ secrets.ELEVENLABS_API_KEY }}
+          YOUTUBE_TOKEN:       ${{ secrets.YOUTUBE_TOKEN }}
+        run: python main.py
+
+      - name: 결과물 보관 (7일)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shorts-output-${{ github.run_number }}
+          path: output/
+          retention-days: 7
