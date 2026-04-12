@@ -26,6 +26,8 @@ def generate_tts(text: str, output_path: str,
         }
     }
     resp = requests.post(url, json=payload, headers=headers, timeout=30)
+    if not resp.ok:
+        print(f'ElevenLabs 오류 [{resp.status_code}]: {resp.text}')
     resp.raise_for_status()
     with open(output_path, 'wb') as f:
         f.write(resp.content)
