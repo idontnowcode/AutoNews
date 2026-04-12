@@ -9,7 +9,11 @@
       "Bash(python3 -c ':*)",
       "Bash(python -c ':*)",
       "Bash(python -c \"import tempfile; print\\(tempfile.gettempdir\\(\\)\\)\")",
-      "Bash(python scripts/office/unpack.py \"C:\\\\Users\\\\admin\\\\Desktop\\\\AI_Based_Projects\\\\1_Youtube_Shorts_Knowledge\\\\유튜브 쇼츠 영상 자동화 프로젝트\\\\YouTube_Shorts_구현가이드.docx\" \"C:\\\\Users\\\\admin\\\\AppData\\\\Local\\\\Temp\\\\docx_unpacked\\\\\\\\\")"
+      "Bash(python scripts/office/unpack.py \"C:\\\\Users\\\\admin\\\\Desktop\\\\AI_Based_Projects\\\\1_Youtube_Shorts_Knowledge\\\\유튜브 쇼츠 영상 자동화 프로젝트\\\\YouTube_Shorts_구현가이드.docx\" \"C:\\\\Users\\\\admin\\\\AppData\\\\Local\\\\Temp\\\\docx_unpacked\\\\\\\\\")",
+      "Bash(python -c \"from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips; print\\('moviepy OK'\\)\")",
+      "Bash(python test_local.py)",
+      "WebFetch(domain:www.genspark.ai)",
+      "WebFetch(domain:gamma.app)"
     ]
   }
 }
