@@ -548,6 +548,7 @@ function showTab(n) {
   }
   if (n === 3) loadNews('all');
   if (n === 4) loadCostStats();
+  try { localStorage.setItem('econ_tab', n); } catch(e) {}
 }
 
 // ── 뉴스 ─────────────────────────────────────────
@@ -1048,6 +1049,13 @@ loadCfg();
     updateGeneratingUI(true);
     _genPollTimer = setTimeout(checkGenStatus, 5000);
   }
+})();
+// 저장된 탭 복원
+(function() {
+  var savedTab = 0;
+  try { savedTab = parseInt(localStorage.getItem('econ_tab') || '0'); } catch(e) {}
+  if (isNaN(savedTab) || savedTab < 0 || savedTab > 4) savedTab = 0;
+  showTab(savedTab);
 })();
 if (cfg.url && cfg.key) {
   connect();
