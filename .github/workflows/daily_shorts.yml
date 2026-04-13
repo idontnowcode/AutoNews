@@ -1,4 +1,4 @@
-name: 경제 교육 Shorts 자동 업로드
+name: 일분 스튜디오 - 커리큘럼 Shorts 업로드
 
 on:
   schedule:

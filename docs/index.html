@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>경제 Shorts 대시보드</title>
+<title>일분 스튜디오</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -137,7 +137,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 <!-- 헤더 -->
 <div class="header">
   <div>
-    <div class="header-title">경제 Shorts</div>
+    <div class="header-title">일분 스튜디오</div>
     <div class="header-sub" id="headerSub">연결 대기 중...</div>
   </div>
   <button class="btn-gear" onclick="openModal()">⚙️</button>
@@ -406,7 +406,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
     </div>
     <div class="form-group">
       <label class="form-label">GitHub 저장소 <span style="color:#555">(즉시 실행용, 선택)</span></label>
-      <input id="cfgRepo" class="form-input" type="text" placeholder="username/AutoNews">
+      <input id="cfgRepo" class="form-input" type="text" placeholder="username/repo">
     </div>
 
     <!-- 자동 업로드 설정 구분선 -->
@@ -592,7 +592,7 @@ function showTab(n) {
   }
   if (n === 3) loadNews('all');
   if (n === 4) loadCostStats();
-  try { localStorage.setItem('econ_tab', n); } catch(e) {}
+  try { localStorage.setItem('ibbun_tab', n); } catch(e) {}
 }
 
 // ── 뉴스 ─────────────────────────────────────────
@@ -1029,7 +1029,7 @@ async function triggerActions() {
 }
 
 // ── 생성 중 상태 관리 ──────────────────────────────
-var GEN_KEY = 'econ_gen';
+var GEN_KEY = 'ibbun_gen';
 var _genPollTimer = null;
 
 function setGenerating() {
@@ -1206,7 +1206,7 @@ loadCfg();
 // 저장된 탭 복원
 (function() {
   var savedTab = 0;
-  try { savedTab = parseInt(localStorage.getItem('econ_tab') || '0'); } catch(e) {}
+  try { savedTab = parseInt(localStorage.getItem('ibbun_tab') || '0'); } catch(e) {}
   if (isNaN(savedTab) || savedTab < 0 || savedTab > 4) savedTab = 0;
   showTab(savedTab);
 })();

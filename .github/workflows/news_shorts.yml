@@ -1,4 +1,4 @@
-name: 경제 뉴스 Shorts 자동 업로드
+name: 일분 스튜디오 - 뉴스 Shorts 업로드
 
 on:
   schedule:
