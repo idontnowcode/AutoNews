@@ -2,7 +2,7 @@
 RSS 피드에서 경제 뉴스 수집 → Supabase news_items 저장
 """
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import feedparser
 from src.db_client import get_client
 
@@ -14,16 +14,26 @@ RSS_FEEDS = [
     ('구글뉴스 경제',  'https://news.google.com/rss/search?q=한국+경제+금융&hl=ko&gl=KR&ceid=KR:ko'),
 ]
 
-MAX_PER_FEED = 5   # 피드당 최대 수집 개수
+DEFAULT_MAX_PER_FEED = 5
 
 
-def fetch_rss_items() -> list[dict]:
+def get_news_settings() -> dict:
+    """news 관련 설정값 반환"""
+    try:
+        db = get_client()
+        res = db.table('settings').select('key,value').execute()
+        return {r['key']: r['value'] for r in (res.data or [])}
+    except Exception:
+        return {}
+
+
+def fetch_rss_items(max_per_feed: int = DEFAULT_MAX_PER_FEED) -> list[dict]:
     """모든 RSS 피드에서 뉴스 수집"""
     items = []
     for source, url in RSS_FEEDS:
         try:
             feed = feedparser.parse(url)
-            for entry in feed.entries[:MAX_PER_FEED]:
+            for entry in feed.entries[:max_per_feed]:
                 title   = entry.get('title', '').strip()
                 link    = entry.get('link', '').strip()
                 summary = entry.get('summary', entry.get('description', '')).strip()
@@ -44,7 +54,7 @@ def fetch_rss_items() -> list[dict]:
                         'summary':      summary,
                         'published_at': published_at,
                     })
-            print(f'   [{source}] {len(feed.entries[:MAX_PER_FEED])}건 수집')
+            print(f'   [{source}] {len(feed.entries[:max_per_feed])}건 수집')
         except Exception as e:
             print(f'   [{source}] 수집 실패: {e}')
     return items
@@ -102,3 +112,17 @@ def mark_news_pending(news_id: str):
 
 def mark_news_failed(news_id: str):
     get_client().table('news_items').update({'status': 'failed'}).eq('id', news_id).execute()
+
+
+def delete_old_news(days: int) -> int:
+    """n일 이상 지난 뉴스 삭제 (done/failed 상태만), 삭제 건수 반환"""
+    if days <= 0:
+        return 0
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    db = get_client()
+    res = db.table('news_items') \
+            .delete() \
+            .in_('status', ['done', 'failed']) \
+            .lt('created_at', cutoff) \
+            .execute()
+    return len(res.data) if res.data else 0

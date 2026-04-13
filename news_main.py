@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 from src.news_fetcher        import (fetch_rss_items, save_new_items, get_next_news,
                                       mark_news_in_progress, mark_news_done, mark_news_pending,
-                                      mark_news_failed)
+                                      mark_news_failed, delete_old_news, get_news_settings)
 from src.news_script_generator import generate_news_script
 from src.image_generator      import generate_all_images
 from src.tts_generator        import generate_segments_tts
@@ -26,9 +26,18 @@ def main():
 
     # ── 1. RSS 수집 + DB 저장 ─────────────────────────
     print('📰 뉴스 RSS 수집 중...')
-    items = fetch_rss_items()
+    settings = get_news_settings()
+    max_per_feed = int(settings.get('news_max_per_feed', 5))
+    items = fetch_rss_items(max_per_feed=max_per_feed)
     saved = save_new_items(items)
     print(f'   총 {len(items)}건 수집 / {saved}건 신규 저장')
+
+    # ── 1-1. 오래된 뉴스 자동 삭제 ───────────────────
+    delete_days = int(settings.get('news_delete_days', 0))
+    if delete_days > 0:
+        deleted = delete_old_news(delete_days)
+        if deleted:
+            print(f'   🗑️  {delete_days}일 이상 된 뉴스 {deleted}건 삭제')
 
     news = None
 
