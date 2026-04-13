@@ -174,6 +174,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
       <button id="nextGenBtn" onclick="triggerNext()" style="margin-top:12px;width:100%;padding:10px;background:#FFD60A;color:#000;font-weight:700;border-radius:8px;font-size:14px;border:none;cursor:pointer">
         ⚡ 이 주제로 즉시 영상 생성
       </button>
+      <div id="genStatusRow" style="display:none;margin-top:8px;text-align:center">
+        <span style="font-size:11px;color:#fb923c">⚠️ 실패하거나 멈춘 경우 →</span>
+        <button onclick="cancelGenerating()" style="font-size:11px;color:#fb923c;background:none;border:none;cursor:pointer;text-decoration:underline;padding:0 4px">생성 중 상태 초기화</button>
+      </div>
     </div>
 
     <div id="topicContainer">
@@ -650,20 +654,28 @@ function clearGenerating() {
 }
 
 function updateGeneratingUI(on) {
-  var nextBtn   = document.getElementById('nextGenBtn');
-  var submitBtn = document.getElementById('submitBtn');
+  var nextBtn    = document.getElementById('nextGenBtn');
+  var submitBtn  = document.getElementById('submitBtn');
+  var statusRow  = document.getElementById('genStatusRow');
   if (nextBtn) {
-    nextBtn.textContent = on ? '🔄 생성 중...' : '⚡ 이 주제로 즉시 영상 생성';
-    nextBtn.disabled    = on;
+    nextBtn.textContent   = on ? '🔄 생성 중...' : '⚡ 이 주제로 즉시 영상 생성';
+    nextBtn.disabled      = on;
     nextBtn.style.opacity = on ? '0.55' : '1';
     nextBtn.style.cursor  = on ? 'not-allowed' : 'pointer';
   }
   if (submitBtn) {
-    submitBtn.textContent = on ? '🔄 생성 중...' : '⚡ 영상 즉시 생성 요청';
-    submitBtn.disabled    = on;
+    submitBtn.textContent   = on ? '🔄 생성 중...' : '⚡ 영상 즉시 생성 요청';
+    submitBtn.disabled      = on;
     submitBtn.style.opacity = on ? '0.55' : '1';
     submitBtn.style.cursor  = on ? 'not-allowed' : 'pointer';
   }
+  if (statusRow) statusRow.style.display = on ? 'block' : 'none';
+}
+
+function cancelGenerating() {
+  clearGenerating();
+  loadCurriculum();
+  toast('🔄 생성 중 상태가 초기화되었습니다');
 }
 
 async function checkGenStatus() {
@@ -694,7 +706,18 @@ async function checkGenStatus() {
           clearGenerating();
           loadHistory();
           loadCurriculum();
-          toast(run.conclusion === 'success' ? '✅ 영상 생성 완료!' : '⚠️ 워크플로우 종료: ' + run.conclusion);
+          if (run.conclusion === 'success') {
+            toast('✅ 영상 생성 완료!');
+          } else {
+            toast('❌ 워크플로우 실패 (' + run.conclusion + ') — GitHub Actions 로그를 확인하세요');
+          }
+          return;
+        }
+        // queued/in_progress 아닌 알 수 없는 상태도 5분 초과 시 해제
+        if (run && run.status !== 'queued' && run.status !== 'in_progress') {
+          clearGenerating();
+          loadCurriculum();
+          toast('⚠️ 워크플로우 상태: ' + run.status + ' — 상태 초기화됨');
           return;
         }
       }
