@@ -4,7 +4,8 @@
 # YouTube OAuth 인증 파일 (민감 정보)
 credentials.json
 token.json
-client_secret_*.json
+client_secret*.json
+client_secrets.json
 
 # 출력 파일 (임시)
 output/

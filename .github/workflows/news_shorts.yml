@@ -1,0 +1,46 @@
+name: 경제 뉴스 Shorts 자동 업로드
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # 6시간마다 (UTC) — 하루 4회
+  workflow_dispatch:
+
+jobs:
+  news-create-and-upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 설정
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: 시스템 패키지 설치 (FFmpeg + 한글 폰트)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-nanum fonts-nanum-extra
+          fc-cache -fv
+
+      - name: Python 패키지 설치
+        run: pip install --no-cache-dir -r requirements.txt
+
+      - name: 뉴스 파이프라인 실행
+        env:
+          ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY:      ${{ secrets.OPENAI_API_KEY }}
+          SUPABASE_URL:        ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY:        ${{ secrets.SUPABASE_KEY }}
+          ELEVENLABS_API_KEY:  ${{ secrets.ELEVENLABS_API_KEY }}
+          YOUTUBE_TOKEN:       ${{ secrets.YOUTUBE_TOKEN }}
+        run: python news_main.py
+
+      - name: 결과물 보관 (3일)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: news-output-${{ github.run_number }}
+          path: output/
+          retention-days: 3

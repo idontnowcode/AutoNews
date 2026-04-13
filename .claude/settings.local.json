@@ -13,7 +13,13 @@
       "Bash(python -c \"from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips; print\\('moviepy OK'\\)\")",
       "Bash(python test_local.py)",
       "WebFetch(domain:www.genspark.ai)",
-      "WebFetch(domain:gamma.app)"
+      "WebFetch(domain:gamma.app)",
+      "Bash(grep -iE \"\\\\.\\(ttf|ttc|otf\\)$\")",
+      "Bash(python tools/generate_font_samples.py)",
+      "Bash(python -X utf8 tools/generate_font_samples.py)",
+      "Bash(python main.py)",
+      "Bash(python -c \"import json; data=json.load\\(open\\('token.json'\\)\\); print\\(json.dumps\\(data\\)\\)\")",
+      "Bash(python -c \"import sys; [print\\(l.encode\\('ascii','replace'\\).decode\\(\\)\\) for l in sys.stdin]\")"
     ]
   }
 }

@@ -1,8 +1,9 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-04-12T16:30:53.315Z",
+  "lastUpdated": "2026-04-13T03:51:56.565Z",
   "activeFeatures": [
-    "1_Youtube_Shorts_Knowledge"
+    "1_Youtube_Shorts_Knowledge",
+    "tools"
   ],
   "primaryFeature": "1_Youtube_Shorts_Knowledge",
   "features": {
@@ -15,9 +16,22 @@
       "documents": {},
       "timestamps": {
         "started": "2026-04-12T14:28:54.041Z",
-        "lastUpdated": "2026-04-12T16:30:53.315Z"
+        "lastUpdated": "2026-04-13T03:51:56.565Z"
       },
-      "lastFile": "C:\\Users\\admin\\Desktop\\AI_Based_Projects\\1_Youtube_Shorts_Knowledge\\src\\image_generator.py"
+      "lastFile": "C:\\Users\\admin\\Desktop\\AI_Based_Projects\\1_Youtube_Shorts_Knowledge\\news_main.py"
+    },
+    "tools": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-04-12T16:46:53.359Z",
+        "lastUpdated": "2026-04-13T01:46:05.346Z"
+      },
+      "lastFile": "C:\\Users\\admin\\Desktop\\AI_Based_Projects\\1_Youtube_Shorts_Knowledge\\tools\\reset_old_videos.py"
     }
   },
   "pipeline": {
@@ -28,7 +42,7 @@
   "session": {
     "startedAt": "2026-04-12T13:18:15.742Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-04-12T16:30:53.315Z"
+    "lastActivity": "2026-04-13T03:51:56.565Z"
   },
   "history": [
     {
@@ -219,6 +233,252 @@
     },
     {
       "timestamp": "2026-04-12T16:30:53.315Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T16:40:47.084Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T16:41:03.854Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T16:41:15.894Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T16:41:21.807Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T16:42:36.001Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T16:42:49.810Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T16:45:31.078Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T16:45:45.300Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T16:46:53.359Z",
+      "feature": "tools",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T16:54:23.459Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T16:54:35.399Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T17:05:09.324Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T17:05:20.671Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T17:05:28.900Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T17:09:26.674Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T17:09:45.994Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T17:12:05.302Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T17:12:10.160Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T17:12:20.152Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-12T17:21:02.029Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T00:21:46.043Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T00:21:50.697Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T00:22:17.924Z",
+      "feature": "tools",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T00:46:48.004Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T00:46:52.501Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T00:46:59.590Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T00:47:09.086Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T00:59:43.425Z",
+      "feature": "tools",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T01:46:05.346Z",
+      "feature": "tools",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T03:38:36.105Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T03:38:40.277Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T03:38:45.431Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T03:41:29.844Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T03:41:37.638Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T03:41:41.527Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T03:45:14.371Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T03:45:20.440Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T03:47:18.615Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T03:51:18.701Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T03:51:39.793Z",
+      "feature": "1_Youtube_Shorts_Knowledge",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-04-13T03:51:56.565Z",
       "feature": "1_Youtube_Shorts_Knowledge",
       "phase": "do",
       "action": "updated"

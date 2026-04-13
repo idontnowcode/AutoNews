@@ -149,11 +149,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 </div>
 
 <!-- 탭 -->
-<div class="tabs">
+<div class="tabs" style="overflow-x:auto;flex-wrap:nowrap">
   <button class="tab-btn active" id="tabBtn0" onclick="showTab(0)">📚 커리큘럼</button>
   <button class="tab-btn" id="tabBtn1" onclick="showTab(1)">🎬 영상 요청</button>
   <button class="tab-btn" id="tabBtn2" onclick="showTab(2)">📋 히스토리</button>
-  <button class="tab-btn" id="tabBtn3" onclick="showTab(3)">💰 비용</button>
+  <button class="tab-btn" id="tabBtn3" onclick="showTab(3)">📰 뉴스</button>
+  <button class="tab-btn" id="tabBtn4" onclick="showTab(4)">💰 비용</button>
 </div>
 
 <!-- 탭 0: 커리큘럼 -->
@@ -237,8 +238,34 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
   </div>
 </div>
 
-<!-- 탭 3: 비용 -->
+<!-- 탭 3: 뉴스 -->
 <div id="tabPane3" style="display:none">
+  <div class="section" style="padding:16px">
+
+    <!-- 헤더 -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;color:#FFD60A">📰 경제 뉴스 Shorts</div>
+      <button onclick="triggerNews()" id="newsGenBtn"
+        style="font-size:12px;padding:6px 12px;background:#FFD60A;color:#000;font-weight:700;border-radius:8px;border:none;cursor:pointer">
+        ⚡ 지금 생성
+      </button>
+    </div>
+
+    <!-- 필터 -->
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+      <button onclick="loadNews('all')"     id="nfAll"     style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;cursor:pointer">전체</button>
+      <button onclick="loadNews('pending')" id="nfPending" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">대기</button>
+      <button onclick="loadNews('done')"    id="nfDone"    style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">완료</button>
+    </div>
+
+    <div class="card" id="newsContainer">
+      <div class="empty"><div class="empty-icon">🔌</div>Supabase 연결 후 표시됩니다</div>
+    </div>
+  </div>
+</div>
+
+<!-- 탭 4: 비용 -->
+<div id="tabPane4" style="display:none">
   <div class="cost-section">
 
     <!-- 실제 데이터 요약 -->
@@ -419,6 +446,7 @@ function connect() {
       loadCurriculum();
       loadHistory();
       loadAutoSettingsForHeader();
+      loadNews('all');
     } catch(e) {
       toast('연결 오류: ' + e.message);
     }
@@ -514,11 +542,109 @@ function updateAutoHeaderBadge(enabled, val, unit) {
 
 // ── 탭 ───────────────────────────────────────────
 function showTab(n) {
-  for (var i = 0; i < 4; i++) {
+  for (var i = 0; i < 5; i++) {
     document.getElementById('tabPane' + i).style.display = i === n ? 'block' : 'none';
     document.getElementById('tabBtn' + i).className = 'tab-btn' + (i === n ? ' active' : '');
   }
-  if (n === 3) loadCostStats();
+  if (n === 3) loadNews('all');
+  if (n === 4) loadCostStats();
+}
+
+// ── 뉴스 ─────────────────────────────────────────
+var _newsFilter = 'all';
+
+async function loadNews(filter) {
+  if (!sb) return;
+  _newsFilter = filter || 'all';
+
+  // 필터 버튼 스타일
+  ['all','pending','done'].forEach(function(f) {
+    var btn = document.getElementById('nf' + f.charAt(0).toUpperCase() + f.slice(1));
+    if (!btn) return;
+    var active = f === _newsFilter;
+    btn.style.background = active ? '#FFD60A22' : 'transparent';
+    btn.style.color      = active ? '#FFD60A'   : '#888';
+    btn.style.borderColor= active ? '#FFD60A55' : '#ffffff20';
+  });
+
+  var query = sb.from('news_items').select('id,title,source,status,youtube_id,published_at,created_at')
+                .order('published_at', {ascending: false}).limit(50);
+  if (_newsFilter !== 'all') query = query.eq('status', _newsFilter);
+
+  var res = await query;
+  if (res.error) { toast('오류: ' + res.error.message); return; }
+  var items = res.data || [];
+  var el = document.getElementById('newsContainer');
+
+  if (!items.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div>'
+      + (_newsFilter === 'all' ? '뉴스 데이터가 없습니다<br><small style="color:#444">GitHub Actions가 실행되면 자동 수집됩니다</small>' : '해당 상태의 뉴스가 없습니다') + '</div>';
+    return;
+  }
+
+  var html = '';
+  items.forEach(function(item) {
+    var badgeCls = item.status === 'done' ? 'badge-done' : item.status === 'in_progress' ? 'badge-progress' : 'badge-pending';
+    var badgeTxt = item.status === 'done' ? '완료' : item.status === 'in_progress' ? '생성중' : '대기';
+    var dateStr  = item.published_at ? fmtDate(item.published_at) : fmtDate(item.created_at);
+    html += '<div style="padding:10px 14px;border-bottom:1px solid #ffffff08;display:flex;align-items:flex-start;gap:10px">';
+    html += '<div style="flex:1;min-width:0">';
+    html += '<div style="font-size:13px;font-weight:500;line-height:1.4;margin-bottom:4px">' + item.title + '</div>';
+    html += '<div style="font-size:11px;color:#555">' + (item.source||'') + ' · ' + dateStr + '</div>';
+    if (item.youtube_id) {
+      html += '<a href="https://youtube.com/shorts/'+item.youtube_id+'" target="_blank" style="font-size:11px;color:#FFD60A">▶ YouTube</a>';
+    }
+    html += '</div>';
+    html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">';
+    html += '<span class="badge ' + badgeCls + '">' + badgeTxt + '</span>';
+    if (item.status === 'pending') {
+      html += '<button onclick="reserveNews(\''+item.id+'\')" style="font-size:10px;padding:2px 7px;background:#ffffff12;border:1px solid #ffffff25;border-radius:5px;color:#ccc;cursor:pointer;margin-top:2px">⚡ 우선</button>';
+    }
+    if (item.status === 'in_progress') {
+      html += '<button onclick="resetNews(\''+item.id+'\')" style="font-size:10px;padding:2px 7px;background:#fb923c22;border:1px solid #fb923c55;border-radius:5px;color:#fb923c;cursor:pointer;margin-top:2px">🔄 초기화</button>';
+    }
+    html += '</div></div>';
+  });
+  el.innerHTML = html;
+}
+
+async function reserveNews(id) {
+  if (!sb) return;
+  // published_at을 미래로 설정해 우선순위 올림
+  var res = await sb.from('news_items').update({ published_at: new Date().toISOString() }).eq('id', id);
+  if (res.error) { toast('오류: ' + res.error.message); return; }
+  if (cfg.token && cfg.repo) {
+    await triggerNewsActions();
+    toast('⚡ 뉴스 즉시 생성 시작');
+  } else {
+    toast('📅 뉴스 우선순위 설정됨');
+  }
+  loadNews(_newsFilter);
+}
+
+async function resetNews(id) {
+  if (!sb) return;
+  await sb.from('news_items').update({ status: 'pending' }).eq('id', id);
+  toast('🔄 대기 상태로 초기화됨');
+  loadNews(_newsFilter);
+}
+
+async function triggerNews() {
+  if (!cfg.token || !cfg.repo) { toast('⚙️ 설정에서 GitHub Token을 입력하세요'); openModal(); return; }
+  var ok = await triggerNewsActions();
+  if (ok) toast('⚡ 뉴스 GitHub Actions 실행 중');
+}
+
+async function triggerNewsActions() {
+  if (!cfg.token || !cfg.repo) return false;
+  var parts = cfg.repo.split('/');
+  var res = await fetch('https://api.github.com/repos/'+parts[0]+'/'+parts[1]+'/actions/workflows/news_shorts.yml/dispatches', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer '+cfg.token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ref:'main'})
+  });
+  if (!res.ok) { toast('GitHub 실행 실패: ' + res.status); return false; }
+  return true;
 }
 
 // ── 비용 (실제 DB 기반) ───────────────────────────
