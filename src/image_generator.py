@@ -24,7 +24,7 @@ def generate_slide_image(prompt: str, output_path: str) -> str:
         model="gpt-image-1",
         prompt=full_prompt,
         size="1024x1024",
-        quality="medium",
+        quality="low",
         n=1,
     )
 
