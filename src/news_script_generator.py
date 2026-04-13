@@ -52,7 +52,83 @@ NEWS_PROMPT = '''
 '''
 
 
+FACT_CHECK_PROMPT = '''
+아래는 뉴스 기사를 바탕으로 작성된 YouTube Shorts 스크립트입니다.
+웹 검색을 통해 주요 사실(수치, 날짜, 기관명, 정책 내용 등)을 팩트체크하고,
+잘못되거나 불정확한 내용이 있으면 수정하세요.
+
+원본 뉴스 제목: {title}
+원본 출처: {source}
+
+스크립트 나레이션:
+{narrations}
+
+[지시사항]
+1. 핵심 사실(숫자, 기관, 날짜, 정책명)을 웹 검색으로 확인하세요.
+2. 확인된 내용 기반으로 스크립트를 수정하세요.
+3. 사실과 다른 내용은 정정하고, 불확실한 내용은 "~로 알려짐", "~예상" 등으로 완화하세요.
+4. 수정이 없는 경우 원본 그대로 반환하세요.
+5. 반드시 아래 JSON 형식으로만 반환하세요 (각 나레이션은 20~40자 이내 유지):
+
+{{
+    "checked": true,
+    "corrections": ["수정 내용 요약 (없으면 빈 배열)"],
+    "narrations": ["세그먼트0 나레이션", "세그먼트1 나레이션", ...]
+}}
+'''
+
+
+def _fact_check_script(news_item: dict, script: dict) -> dict:
+    """Claude web search로 스크립트 팩트체크 후 나레이션 보정"""
+    narrations = [s['narration'] for s in script.get('segments', [])]
+    prompt = FACT_CHECK_PROMPT.format(
+        title=news_item.get('title', ''),
+        source=news_item.get('source', ''),
+        narrations='\n'.join(f'{i}: {n}' for i, n in enumerate(narrations))
+    )
+
+    try:
+        msg = client.messages.create(
+            model='claude-sonnet-4-6',
+            max_tokens=2048,
+            tools=[{'type': 'web_search_20250305', 'name': 'web_search'}],
+            messages=[{'role': 'user', 'content': prompt}]
+        )
+
+        # 텍스트 블록만 추출
+        raw = ''
+        for block in msg.content:
+            if hasattr(block, 'text'):
+                raw += block.text
+
+        raw = raw.strip()
+        raw = re.sub(r'```[a-z]*', '', raw).strip('`').strip()
+        match = re.search(r'\{.*\}', raw, re.DOTALL)
+        if not match:
+            print('   ⚠️  팩트체크 JSON 파싱 실패 — 원본 유지')
+            return script
+
+        fc = json.loads(match.group())
+        corrections = fc.get('corrections', [])
+        if corrections:
+            print(f'   🔍 팩트체크 수정사항: {corrections}')
+        else:
+            print('   ✅ 팩트체크 이상 없음')
+
+        # 나레이션 교체
+        new_narrations = fc.get('narrations', [])
+        for i, seg in enumerate(script.get('segments', [])):
+            if i < len(new_narrations) and new_narrations[i]:
+                seg['narration'] = new_narrations[i]
+
+    except Exception as e:
+        print(f'   ⚠️  팩트체크 오류 ({e}) — 원본 유지')
+
+    return script
+
+
 def generate_news_script(news_item: dict) -> dict:
+    # ── 1단계: 스크립트 초안 생성 ─────────────────────
     msg = client.messages.create(
         model='claude-sonnet-4-6',
         max_tokens=2048,
@@ -75,4 +151,9 @@ def generate_news_script(news_item: dict) -> dict:
     # 제목 후처리 (이란/란 문법 교정 — 해당하는 경우)
     if 'title' in result and ('이란?' in result['title'] or '란?' in result['title']):
         result['title'] = fix_title_grammar(result['title'])
+
+    # ── 2단계: 웹 검색 팩트체크 ──────────────────────
+    print('   🔍 웹 검색 팩트체크 중...')
+    result = _fact_check_script(news_item, result)
+
     return result
