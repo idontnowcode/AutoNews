@@ -20,9 +20,21 @@ BASE_STYLE = (
 _IMAGE_INTERVAL_SEC = 13
 
 
+CARICATURE_STYLE = (
+    "cartoon caricature illustration, bright white background, "
+    "exaggerated facial features, bold outlines, flat colors, "
+    "editorial cartoon style, no photorealism, no realistic rendering, "
+    "absolutely no Korean text, no Asian characters"
+)
+
+
 def generate_slide_image(prompt: str, output_path: str) -> str:
     """gpt-image-1로 이미지 생성 후 로컬 저장 (base64 응답, rate limit 재시도)"""
-    full_prompt = f"{prompt}, {BASE_STYLE}"
+    # 카리커처 프롬프트는 BASE_STYLE 대신 CARICATURE_STYLE 적용
+    if 'caricature' in prompt.lower():
+        full_prompt = f"{prompt}, {CARICATURE_STYLE}"
+    else:
+        full_prompt = f"{prompt}, {BASE_STYLE}"
 
     for attempt in range(5):
         try:

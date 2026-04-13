@@ -55,13 +55,13 @@ NEWS_PROMPT = '''
 
 # 이미지 프롬프트 규칙 — 인물 관련 여부에 따라 분기
 IMAGE_RULE_PERSON = (
-    "뉴스의 핵심 인물({person_name})이 등장하는 세그먼트는 반드시 "
-    "그 인물을 묘사한 cartoon caricature 그림체로 그려줄 것. "
-    "실사 사진 스타일 절대 금지, 만화/카툰 스타일만 허용. "
-    "인물 특징(헤어, 복장, 표정)을 과장된 카리커처로 표현."
+    "When drawing the key person ({person_name}), use cartoon caricature style: "
+    "exaggerated features, bold outlines, flat colors, editorial cartoon look. "
+    "No photorealism. No realistic faces. Caricature only. "
+    "Include the word 'caricature' in the image prompt for segments featuring this person."
 )
 IMAGE_RULE_DEFAULT = (
-    "뉴스 내용을 직관적으로 보여주는 교육용 카툰 장면."
+    "Draw educational cartoon scenes that visually represent the news content."
 )
 
 
