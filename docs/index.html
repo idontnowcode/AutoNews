@@ -612,7 +612,7 @@ async function loadNews(filter) {
     btn.style.borderColor= active ? '#FFD60A55' : '#ffffff20';
   });
 
-  var query = sb.from('news_items').select('id,title,source,status,youtube_id,published_at,created_at')
+  var query = sb.from('news_items').select('id,title,source,status,youtube_id,published_at,created_at,category')
                 .order('published_at', {ascending: false}).limit(50);
   if (_newsFilter !== 'all') query = query.eq('status', _newsFilter);
 
@@ -635,7 +635,8 @@ async function loadNews(filter) {
     html += '<div style="padding:10px 14px;border-bottom:1px solid #ffffff08;display:flex;align-items:flex-start;gap:10px">';
     html += '<div style="flex:1;min-width:0">';
     html += '<div style="font-size:13px;font-weight:500;line-height:1.4;margin-bottom:4px">' + item.title + '</div>';
-    html += '<div style="font-size:11px;color:#555">' + (item.source||'') + ' · ' + dateStr + '</div>';
+    var catTag = item.category ? '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#ffffff15;color:#aaa;margin-right:5px">'+item.category+'</span>' : '';
+    html += '<div style="font-size:11px;color:#555">' + catTag + (item.source||'') + ' · ' + dateStr + '</div>';
     if (item.youtube_id) {
       html += '<a href="https://youtube.com/shorts/'+item.youtube_id+'" target="_blank" style="font-size:11px;color:#FFD60A">▶ YouTube</a>';
     }
