@@ -254,9 +254,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 
     <!-- 필터 -->
     <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
-      <button onclick="loadNews('all')"     id="nfAll"     style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;cursor:pointer">전체</button>
-      <button onclick="loadNews('pending')" id="nfPending" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">대기</button>
-      <button onclick="loadNews('done')"    id="nfDone"    style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">완료</button>
+      <button onclick="loadNews('all')"         id="nfAll"        style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;cursor:pointer">전체</button>
+      <button onclick="loadNews('pending')"     id="nfPending"    style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">대기</button>
+      <button onclick="loadNews('in_progress')" id="nfIn_progress" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">진행중</button>
+      <button onclick="loadNews('failed')"      id="nfFailed"     style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">실패</button>
+      <button onclick="loadNews('done')"        id="nfDone"       style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">완료</button>
     </div>
 
     <div class="card" id="newsContainer">
@@ -560,7 +562,7 @@ async function loadNews(filter) {
   _newsFilter = filter || 'all';
 
   // 필터 버튼 스타일
-  ['all','pending','done'].forEach(function(f) {
+  ['all','pending','in_progress','failed','done'].forEach(function(f) {
     var btn = document.getElementById('nf' + f.charAt(0).toUpperCase() + f.slice(1));
     if (!btn) return;
     var active = f === _newsFilter;
@@ -600,7 +602,7 @@ async function loadNews(filter) {
     html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">';
     html += '<span class="badge ' + badgeCls + '">' + badgeTxt + '</span>';
     if (item.status === 'pending') {
-      html += '<button onclick="reserveNews(\''+item.id+'\')" style="font-size:10px;padding:2px 7px;background:#ffffff12;border:1px solid #ffffff25;border-radius:5px;color:#ccc;cursor:pointer;margin-top:2px">⚡ 우선</button>';
+      html += '<button onclick="reserveNews(\''+item.id+'\')" style="font-size:10px;padding:2px 7px;background:#ffffff12;border:1px solid #ffffff25;border-radius:5px;color:#ccc;cursor:pointer;margin-top:2px">▶ 진행</button>';
     }
     if (item.status === 'in_progress' || item.status === 'failed') {
       html += '<button onclick="resetNews(\''+item.id+'\')" style="font-size:10px;padding:2px 7px;background:#fb923c22;border:1px solid #fb923c55;border-radius:5px;color:#fb923c;cursor:pointer;margin-top:2px">🔄 초기화</button>';
