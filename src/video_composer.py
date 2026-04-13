@@ -81,6 +81,26 @@ def _draw_centered_text(draw, text: str, y: int, font, fill,
     return y
 
 
+def _measure_text_height(draw, text: str, font, max_width: int,
+                         line_gap: int = 16) -> int:
+    """텍스트 전체 높이(px) 계산"""
+    total = 0
+    for line in _wrap_text(draw, text, font, max_width):
+        bbox = draw.textbbox((0, 0), line, font=font)
+        total += (bbox[3] - bbox[1]) + line_gap
+    return total
+
+
+def _fit_title_font(draw, title: str, max_width: int,
+                    max_height: int = 230) -> ImageFont.FreeTypeFont:
+    """제목이 max_height 안에 들어오도록 폰트 크기 자동 조정"""
+    for size in (96, 76, 60, 48):
+        font = _get_font(size, bold=True)
+        if _measure_text_height(draw, title, font, max_width) <= max_height:
+            return font
+    return _get_font(48, bold=True)
+
+
 def make_frame(title: str, image_path: str, narration: str,
                frame_path: str) -> str:
     """한 세그먼트 합성 프레임 PNG 생성"""
@@ -88,10 +108,16 @@ def make_frame(title: str, image_path: str, narration: str,
     draw  = ImageDraw.Draw(frame)
     pad   = 50
 
-    # ── 상단: 노란 강조 제목 ─────────────────────────
-    title_font = _get_font(96, bold=True)
+    # ── 상단: 노란 강조 제목 (폰트 자동 축소) ──────────
+    title_font = _fit_title_font(draw, title, W - pad * 2, max_height=230)
+    title_h    = _measure_text_height(draw, title, title_font, W - pad * 2)
     _draw_centered_text(draw, title, TITLE_TOP, title_font,
                         C_YELLOW, W - pad * 2, line_gap=16)
+
+    # 제목 아래 40px 여백 확보, 최소 IMG_Y 보장
+    img_y = max(IMG_Y, TITLE_TOP + title_h + 40)
+    # 하단 자막 공간 360px 확보
+    img_y = min(img_y, H - IMG_SIZE - 360)
 
     # ── 중간: DALL-E 이미지 (검정 배경 위에 정사각형) ──
     if image_path and os.path.exists(image_path):
@@ -101,16 +127,18 @@ def make_frame(title: str, image_path: str, narration: str,
         img  = img.crop(((iw - side) // 2, (ih - side) // 2,
                           (iw + side) // 2, (ih + side) // 2))
         img  = img.resize((IMG_SIZE, IMG_SIZE), Image.LANCZOS)
-        frame.paste(img, (0, IMG_Y))
+        frame.paste(img, (0, img_y))
     else:
-        draw.rectangle([(0, IMG_Y), (W, IMG_Y + IMG_SIZE)], fill=C_BLACK)
+        draw.rectangle([(0, img_y), (W, img_y + IMG_SIZE)], fill=C_BLACK)
 
-    # ── 하단: 흰 나레이션 자막 (최대 3줄, 하단 고정) ────
-    sub_font = _get_font(62, bold=True)
-    lines    = _wrap_text(draw, narration, sub_font, W - pad * 2)[:3]
-    line_h   = sub_font.getbbox('가')[3] + 14   # 줄 높이 + 간격
-    total_h  = line_h * len(lines)
-    y = H - 200 - total_h                       # 하단 200px 여백 (약 2줄 위로)
+    # ── 하단: 흰 나레이션 자막 (최대 3줄, 이미지 아래 고정) ──
+    sub_font   = _get_font(62, bold=True)
+    lines      = _wrap_text(draw, narration, sub_font, W - pad * 2)[:3]
+    line_h     = sub_font.getbbox('가')[3] + 14
+    total_h    = line_h * len(lines)
+    sub_top    = img_y + IMG_SIZE + 20           # 이미지 아래 20px
+    sub_bottom = H - 80                          # 화면 하단 80px 여백
+    y = max(sub_top, sub_bottom - total_h)       # 공간 있으면 이미지 바로 아래, 없으면 하단 고정
     for line in lines:
         lw = draw.textlength(line, font=sub_font)
         draw.text(((W - lw) // 2, y), line, font=sub_font, fill=C_WHITE)
