@@ -142,6 +142,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
   <button class="btn-gear" onclick="openModal()">⚙️</button>
 </div>
 
+<!-- 생성 중 배너 (전역, 항상 표시) -->
+<div id="genBanner" style="display:none;background:#d9770622;border-bottom:1px solid #d9770644;padding:8px 16px;display:none;align-items:center;justify-content:space-between">
+  <span style="font-size:13px;color:#fb923c">🔄 영상 생성 중... GitHub Actions 실행 중</span>
+  <button onclick="cancelGenerating()" style="font-size:12px;color:#fb923c;background:#fb923c22;border:1px solid #fb923c55;border-radius:6px;padding:4px 10px;cursor:pointer">✕ 초기화</button>
+</div>
+
 <!-- 탭 -->
 <div class="tabs">
   <button class="tab-btn active" id="tabBtn0" onclick="showTab(0)">📚 커리큘럼</button>
@@ -654,9 +660,10 @@ function clearGenerating() {
 }
 
 function updateGeneratingUI(on) {
-  var nextBtn    = document.getElementById('nextGenBtn');
-  var submitBtn  = document.getElementById('submitBtn');
-  var statusRow  = document.getElementById('genStatusRow');
+  var nextBtn   = document.getElementById('nextGenBtn');
+  var submitBtn = document.getElementById('submitBtn');
+  var statusRow = document.getElementById('genStatusRow');
+  var banner    = document.getElementById('genBanner');
   if (nextBtn) {
     nextBtn.textContent   = on ? '🔄 생성 중...' : '⚡ 이 주제로 즉시 영상 생성';
     nextBtn.disabled      = on;
@@ -670,6 +677,7 @@ function updateGeneratingUI(on) {
     submitBtn.style.cursor  = on ? 'not-allowed' : 'pointer';
   }
   if (statusRow) statusRow.style.display = on ? 'block' : 'none';
+  if (banner)    banner.style.display    = on ? 'flex'  : 'none';
 }
 
 function cancelGenerating() {
