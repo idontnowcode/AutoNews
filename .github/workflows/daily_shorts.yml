@@ -2,7 +2,7 @@ name: 경제 교육 Shorts 자동 업로드
 
 on:
   schedule:
-    - cron: '0 22 * * *'   # UTC 22:00 = KST 07:00
+    - cron: '0 * * * *'    # 매시간 실행 — 실제 업로드 여부는 Supabase settings로 제어
   workflow_dispatch:
 
 jobs:

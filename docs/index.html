@@ -339,6 +339,35 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
       <input id="cfgRepo" class="form-input" type="text" placeholder="username/AutoNews">
     </div>
 
+    <!-- 자동 업로드 설정 구분선 -->
+    <div style="border-top:1px solid #ffffff15;margin:16px 0 14px"></div>
+    <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">🤖 자동 업로드</div>
+
+    <div class="form-group" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <div style="font-size:14px;font-weight:600">자동 업로드</div>
+        <div style="font-size:11px;color:#555;margin-top:2px">OFF 시 수동 즉시 생성만 가능</div>
+      </div>
+      <label style="position:relative;width:44px;height:24px;cursor:pointer">
+        <input type="checkbox" id="cfgAutoEnabled" style="opacity:0;width:0;height:0">
+        <span id="cfgAutoToggle" onclick="toggleAutoSwitch()" style="position:absolute;inset:0;background:#ffffff20;border-radius:12px;transition:.2s;cursor:pointer">
+          <span id="cfgAutoKnob" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.2s"></span>
+        </span>
+      </label>
+    </div>
+
+    <div id="cfgIntervalRow" class="form-group" style="display:none">
+      <label class="form-label">업로드 간격</label>
+      <div style="display:flex;gap:8px">
+        <input id="cfgIntervalVal" class="form-input" type="number" min="1" max="168" value="1" style="width:80px;text-align:center">
+        <select id="cfgIntervalUnit" class="form-input">
+          <option value="hours">시간마다</option>
+          <option value="days" selected>일마다</option>
+        </select>
+      </div>
+      <div style="font-size:11px;color:#555;margin-top:4px">예) 1일마다 = 매일 1개 · 12시간마다 = 하루 2개</div>
+    </div>
+
     <div class="modal-footer">
       <button class="btn-primary" onclick="saveConfig()">저장 및 연결</button>
     </div>
@@ -368,6 +397,8 @@ function saveConfig() {
   try { localStorage.setItem('econ_cfg', JSON.stringify(cfg)); } catch(e) { /* 샌드박스 환경 무시 */ }
   closeModal();
   connect();
+  // Supabase 연결 후 자동 업로드 설정 저장 (약간 지연)
+  setTimeout(function(){ if (sb) saveAutoSettings(); }, 1500);
 }
 
 function connect() {
@@ -387,6 +418,7 @@ function connect() {
       if (tw) tw.style.display = cfg.token ? 'block' : 'none';
       loadCurriculum();
       loadHistory();
+      loadAutoSettingsForHeader();
     } catch(e) {
       toast('연결 오류: ' + e.message);
     }
@@ -401,12 +433,83 @@ function openModal() {
   document.getElementById('cfgToken').value = cfg.token || '';
   document.getElementById('cfgRepo').value  = cfg.repo  || '';
   document.getElementById('modal').style.display = 'flex';
+  // 자동 업로드 설정 불러오기
+  if (sb) loadAutoSettings();
+}
+
+// ── 자동 업로드 설정 ──────────────────────────────
+function toggleAutoSwitch() {
+  var cb = document.getElementById('cfgAutoEnabled');
+  cb.checked = !cb.checked;
+  updateAutoToggleUI(cb.checked);
+}
+function updateAutoToggleUI(on) {
+  var toggle = document.getElementById('cfgAutoToggle');
+  var knob   = document.getElementById('cfgAutoKnob');
+  var row    = document.getElementById('cfgIntervalRow');
+  toggle.style.background = on ? '#FFD60A' : '#ffffff20';
+  knob.style.background   = on ? '#000'    : '#888';
+  knob.style.left         = on ? '22px'    : '2px';
+  row.style.display       = on ? 'block'   : 'none';
+}
+
+async function loadAutoSettings() {
+  if (!sb) return;
+  var res = await sb.from('settings').select('key,value');
+  if (res.error || !res.data) return;
+  var s = {};
+  res.data.forEach(function(r){ s[r.key] = r.value; });
+
+  var enabled = s['auto_enabled'] !== 'false';
+  document.getElementById('cfgAutoEnabled').checked = enabled;
+  updateAutoToggleUI(enabled);
+
+  if (s['interval_value']) document.getElementById('cfgIntervalVal').value  = s['interval_value'];
+  if (s['interval_unit'])  document.getElementById('cfgIntervalUnit').value = s['interval_unit'];
+}
+
+async function saveAutoSettings() {
+  if (!sb) return;
+  var enabled  = document.getElementById('cfgAutoEnabled').checked;
+  var intVal   = document.getElementById('cfgIntervalVal').value  || '1';
+  var intUnit  = document.getElementById('cfgIntervalUnit').value || 'days';
+
+  var rows = [
+    { key: 'auto_enabled',   value: String(enabled) },
+    { key: 'interval_value', value: intVal },
+    { key: 'interval_unit',  value: intUnit }
+  ];
+  for (var i = 0; i < rows.length; i++) {
+    await sb.from('settings').upsert(rows[i], { onConflict: 'key' });
+  }
+  // 헤더 상태 업데이트
+  updateAutoHeaderBadge(enabled, intVal, intUnit);
 }
 function closeModal() {
   document.getElementById('modal').style.display = 'none';
 }
 function overlayClick(e) {
   if (e.target === document.getElementById('modal')) closeModal();
+}
+
+async function loadAutoSettingsForHeader() {
+  if (!sb) return;
+  var res = await sb.from('settings').select('key,value');
+  if (res.error || !res.data) return;
+  var s = {};
+  res.data.forEach(function(r){ s[r.key] = r.value; });
+  var enabled = s['auto_enabled'] !== 'false';
+  updateAutoHeaderBadge(enabled, s['interval_value'] || '1', s['interval_unit'] || 'days');
+}
+
+function updateAutoHeaderBadge(enabled, val, unit) {
+  var sub = document.getElementById('headerSub');
+  if (!sub) return;
+  var current = sub.textContent.replace(/\s*·\s*(🟢|🔴).*/,'');
+  var badge = enabled
+    ? ' · 🟢 ' + val + (unit==='hours' ? '시간' : '일') + '마다'
+    : ' · 🔴 자동OFF';
+  sub.textContent = current + badge;
 }
 
 // ── 탭 ───────────────────────────────────────────

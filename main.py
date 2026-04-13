@@ -4,6 +4,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from src.topic_manager    import get_next_topic, mark_in_progress, mark_done, mark_pending, save_video
+from src.settings_manager import check_should_run
 from src.script_generator import generate_script
 from src.image_generator  import generate_all_images
 from src.tts_generator    import generate_segments_tts
@@ -14,6 +15,10 @@ load_dotenv()
 
 
 def main():
+    # ── 0. 자동 업로드 설정 체크 ──────────────────────
+    if not check_should_run():
+        sys.exit(0)
+
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
     os.makedirs('output', exist_ok=True)
     work_dir = f'output/{ts}'
