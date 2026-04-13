@@ -10,8 +10,9 @@ client = OpenAI(api_key=os.environ['OPENAI_API_KEY'])
 BASE_STYLE = (
     "educational cartoon illustration, bright white background, "
     "colorful cute characters explaining the concept, "
-    "Korean webtoon style, vibrant colors, simple and clear layout, "
-    "no English text, Korean labels are OK if needed"
+    "vibrant colors, simple and clear layout, "
+    "English labels only if text is needed, "
+    "absolutely no Korean text, no Chinese text, no Japanese text, no Asian characters"
 )
 
 
