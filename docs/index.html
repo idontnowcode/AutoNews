@@ -556,6 +556,9 @@ async function loadCurriculum() {
       if (t.status === 'pending' && !isNext) {
         html += '<button onclick="reserveTopic(\''+t.id+'\',\''+t.title+'\')" style="font-size:11px;padding:3px 8px;background:#ffffff12;border:1px solid #ffffff25;border-radius:6px;color:#ccc;cursor:pointer">📅 예약</button>';
       }
+      if (t.status === 'in_progress') {
+        html += '<button onclick="resetTopic(\''+t.id+'\')" style="font-size:11px;padding:3px 8px;background:#fb923c22;border:1px solid #fb923c55;border-radius:6px;color:#fb923c;cursor:pointer">🔄 초기화</button>';
+      }
       html += '<span class="badge '+badgeCls+'">'+badgeTxt+'</span>';
       html += '<button onclick="deleteTopic(\''+t.id+'\')" style="font-size:14px;padding:3px 6px;background:transparent;border:none;color:#ff4d4d99;cursor:pointer" title="삭제">🗑️</button>';
       html += '</div></div>';
@@ -737,6 +740,14 @@ async function checkGenStatus() {
   _genPollTimer = setTimeout(checkGenStatus, 30000);
 }
 
+
+async function resetTopic(id) {
+  if (!sb) return;
+  var res = await sb.from('topics').update({ status: 'pending' }).eq('id', id);
+  if (res.error) { toast('오류: ' + res.error.message); return; }
+  toast('🔄 대기 상태로 초기화됐습니다');
+  loadCurriculum();
+}
 
 async function deleteTopic(id) {
   if (!sb) return;
