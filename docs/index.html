@@ -604,6 +604,7 @@ async function loadNews(filter) {
     if (item.status === 'in_progress') {
       html += '<button onclick="resetNews(\''+item.id+'\')" style="font-size:10px;padding:2px 7px;background:#fb923c22;border:1px solid #fb923c55;border-radius:5px;color:#fb923c;cursor:pointer;margin-top:2px">🔄 초기화</button>';
     }
+    html += '<button onclick="deleteNews(\''+item.id+'\')" style="font-size:10px;padding:2px 7px;background:#ef444422;border:1px solid #ef444455;border-radius:5px;color:#ef4444;cursor:pointer;margin-top:2px">🗑️ 삭제</button>';
     html += '</div></div>';
   });
   el.innerHTML = html;
@@ -627,6 +628,15 @@ async function resetNews(id) {
   if (!sb) return;
   await sb.from('news_items').update({ status: 'pending' }).eq('id', id);
   toast('🔄 대기 상태로 초기화됨');
+  loadNews(_newsFilter);
+}
+
+async function deleteNews(id) {
+  if (!confirm('이 뉴스 항목을 삭제하시겠습니까?')) return;
+  if (!sb) return;
+  var res = await sb.from('news_items').delete().eq('id', id);
+  if (res.error) { toast('오류: ' + res.error.message); return; }
+  toast('🗑️ 삭제됨');
   loadNews(_newsFilter);
 }
 
