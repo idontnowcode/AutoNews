@@ -98,3 +98,7 @@ def mark_news_done(news_id: str, youtube_id: str):
 
 def mark_news_pending(news_id: str):
     get_client().table('news_items').update({'status': 'pending'}).eq('id', news_id).execute()
+
+
+def mark_news_failed(news_id: str):
+    get_client().table('news_items').update({'status': 'failed'}).eq('id', news_id).execute()

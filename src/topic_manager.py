@@ -63,6 +63,11 @@ def mark_pending(topic_id: str):
     db.table('topics').update({'status': 'pending'}).eq('id', topic_id).execute()
 
 
+def mark_failed(topic_id: str):
+    db = get_client()
+    db.table('topics').update({'status': 'failed'}).eq('id', topic_id).execute()
+
+
 def save_video(topic_id: str, youtube_id: str, script: dict, slide_prompts: list):
     db = get_client()
     db.table('videos').insert({
