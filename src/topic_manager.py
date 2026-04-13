@@ -57,6 +57,12 @@ def mark_done(topic_id: str):
     db.table('topics').update({'status': 'done'}).eq('id', topic_id).execute()
 
 
+def mark_pending(topic_id: str):
+    """업로드 실패 시 topic을 pending으로 되돌려 재시도 가능하게 함"""
+    db = get_client()
+    db.table('topics').update({'status': 'pending'}).eq('id', topic_id).execute()
+
+
 def save_video(topic_id: str, youtube_id: str, script: dict, slide_prompts: list):
     db = get_client()
     db.table('videos').insert({

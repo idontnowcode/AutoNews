@@ -1,8 +1,9 @@
 import os
+import sys
 from datetime import datetime
 from dotenv import load_dotenv
 
-from src.topic_manager    import get_next_topic, mark_in_progress, mark_done, save_video
+from src.topic_manager    import get_next_topic, mark_in_progress, mark_done, mark_pending, save_video
 from src.script_generator import generate_script
 from src.image_generator  import generate_all_images
 from src.tts_generator    import generate_segments_tts
@@ -17,10 +18,11 @@ def main():
     os.makedirs('output', exist_ok=True)
     work_dir = f'output/{ts}'
     os.makedirs(work_dir, exist_ok=True)
+    topic = None   # 실패 시 rollback용
 
     # ── 1. 주제 선택 ───────────────────────────────────
     print('📚 다음 주제 선택 중...')
-    topic = get_next_topic()
+    topic = get_next_topic()  # noqa: F841 — rollback 변수 덮어씀
     print(f'   [{topic["level"]}] {topic["title"]} ({topic["category"]})')
     mark_in_progress(topic['id'])
 
@@ -53,7 +55,17 @@ def main():
 
     # ── 6. YouTube 업로드 ──────────────────────────────
     print('📤 YouTube 업로드 중...')
-    video_id = upload_shorts(video_path, script)
+    try:
+        video_id = upload_shorts(video_path, script)
+    except Exception as e:
+        err = str(e)
+        print(f'❌ 업로드 실패: {err}')
+        # topic을 pending으로 되돌려 다음 실행 때 재시도 가능하게 함
+        mark_pending(topic['id'])
+        if 'uploadLimitExceeded' in err:
+            print('⚠️  YouTube 일일 업로드 한도 초과.')
+            print('   해결: https://www.youtube.com/verify 에서 채널 인증 후 재시도')
+        sys.exit(1)
     print(f'✅ 업로드 완료: https://youtube.com/shorts/{video_id}')
 
     # ── 7. DB 저장 ────────────────────────────────────
