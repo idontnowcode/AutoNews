@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 * * * *'    # 매시간 실행 — 실제 업로드 여부는 Supabase settings로 제어
   workflow_dispatch:
+    inputs:
+      force:
+        description: '간격 체크 무시하고 즉시 실행'
+        required: false
+        default: 'true'
 
 jobs:
   create-and-upload:
@@ -38,6 +43,7 @@ jobs:
           SUPABASE_KEY:        ${{ secrets.SUPABASE_KEY }}
           ELEVENLABS_API_KEY:  ${{ secrets.ELEVENLABS_API_KEY }}
           YOUTUBE_TOKEN:       ${{ secrets.YOUTUBE_TOKEN }}
+          FORCE_RUN:           ${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}
         run: python main.py
 
       - name: 결과물 보관 (3일)

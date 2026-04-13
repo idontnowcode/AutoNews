@@ -2,6 +2,7 @@
 자동 업로드 설정 관리
 Supabase settings 테이블에서 설정 읽기 + 업로드 실행 여부 판단
 """
+import os
 from datetime import datetime, timezone, timedelta
 from src.db_client import get_client
 
@@ -15,9 +16,15 @@ def get_settings() -> dict:
 def check_should_run() -> bool:
     """
     업로드 실행 여부 판단:
+      - FORCE_RUN=true (workflow_dispatch) → 무조건 실행
       - auto_enabled = false → 건너뜀
       - 마지막 업로드 이후 interval 미경과 → 건너뜀
     """
+    # 즉시 실행 (workflow_dispatch) 시 모든 체크 무시
+    if os.environ.get('FORCE_RUN', '').lower() == 'true':
+        print('⚡ 즉시 실행 모드 — 간격/설정 체크 건너뜁니다.')
+        return True
+
     try:
         settings = get_settings()
     except Exception as e:
