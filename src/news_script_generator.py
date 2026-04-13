@@ -11,15 +11,16 @@ from src.script_generator import fix_title_grammar
 client = anthropic.Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
 
 NEWS_PROMPT = '''
-당신은 경제 뉴스 YouTube Shorts 채널의 콘텐츠 제작자입니다.
+당신은 뉴스 YouTube Shorts 채널의 콘텐츠 제작자입니다.
 아래 뉴스 기사를 60초 Shorts 영상 스크립트로 만들어주세요.
 
 뉴스 제목: {title}
 뉴스 출처: {source}
 기사 요약: {summary}
+분야: {category}
 
 [요구사항]
-- 대상: 경제에 관심 있는 20~40대 직장인
+- 대상: {category} 분야에 관심 있는 20~40대
 - 세그먼트 수: 6~8개
 - ★ 각 세그먼트 나레이션은 반드시 20~40자 이내 ★
 - 뉴스 내용을 이해하기 쉽게 요약 (전문용어 최소화)
@@ -27,20 +28,21 @@ NEWS_PROMPT = '''
     0: 헤드라인 한 줄 요약 (시청자 관심 유발)
     1: 무슨 일이 일어났나?
     2~5: 핵심 내용 / 배경 / 숫자/데이터
-    마지막: 우리 생활에 미치는 영향 또는 전망
+    마지막: 영향 또는 전망
 
-[이미지 프롬프트 규칙 — 영어로만, 뉴스 내용 시각화]
+[이미지 프롬프트 규칙 — 영어로만]
 - 반드시 영어로 작성 (한글/한자 절대 금지)
-- 뉴스 내용을 직관적으로 보여주는 교육용 카툰 장면
+- {image_rule}
 - 캐릭터, 차트, 화살표, 건물, 아이콘 등 활용
 - 첫 세그먼트: 뉴스 핵심 오브젝트 + 놀란 캐릭터
 - 마지막 세그먼트: 영향 받는 사람들 또는 미래 전망 이미지
 
 [출력 형식 — 반드시 아래 JSON만 반환]
 {{
-    "title": "뉴스 핵심을 담은 제목 (예: '금리 인상'이란? 형식 아니어도 됨, 30자 이내)",
+    "title": "뉴스 핵심을 담은 제목 (30자 이내)",
     "description": "유튜브 설명문 (150자 이내) — 시간 표현 금지",
-    "hashtags": ["경제뉴스", "경제", "재테크", "뉴스요약", "주제태그"],
+    "hashtags": ["{category}뉴스", "{category}", "뉴스요약", "주제태그"],
+    "person_name": "기사의 핵심 인물 이름 (없으면 null)",
     "segments": [
         {{
             "index": 0,
@@ -50,6 +52,17 @@ NEWS_PROMPT = '''
     ]
 }}
 '''
+
+# 이미지 프롬프트 규칙 — 인물 관련 여부에 따라 분기
+IMAGE_RULE_PERSON = (
+    "뉴스의 핵심 인물({person_name})이 등장하는 세그먼트는 반드시 "
+    "그 인물을 묘사한 cartoon caricature 그림체로 그려줄 것. "
+    "실사 사진 스타일 절대 금지, 만화/카툰 스타일만 허용. "
+    "인물 특징(헤어, 복장, 표정)을 과장된 카리커처로 표현."
+)
+IMAGE_RULE_DEFAULT = (
+    "뉴스 내용을 직관적으로 보여주는 교육용 카툰 장면."
+)
 
 
 FACT_CHECK_PROMPT = '''
@@ -127,7 +140,36 @@ def _fact_check_script(news_item: dict, script: dict) -> dict:
     return script
 
 
+def _detect_person(title: str, summary: str) -> str | None:
+    """제목/요약에서 핵심 인물 이름 간단 감지 (Claude 호출 없이)"""
+    # 인물 관련 패턴: '이름 + 직책/동사' 형태
+    import re
+    # 한국인 이름 패턴 (2~4자 한글)
+    patterns = [
+        r'([가-힣]{2,4})\s*(대통령|장관|대표|총리|의원|회장|CEO|감독|선수|코치)',
+        r'(트럼프|바이든|머스크|시진핑|푸틴|기시다|젤렌스키)',  # 주요 외국 인물
+    ]
+    for pat in patterns:
+        m = re.search(pat, title + ' ' + summary)
+        if m:
+            return m.group(1)
+    return None
+
+
 def generate_news_script(news_item: dict) -> dict:
+    category = news_item.get('category', '경제')
+
+    # 인물 감지 → 이미지 규칙 분기
+    person = _detect_person(
+        news_item.get('title', ''),
+        news_item.get('summary', '')
+    )
+    if person:
+        image_rule = IMAGE_RULE_PERSON.format(person_name=person)
+        print(f'   👤 인물 감지: {person} → 카리커처 모드')
+    else:
+        image_rule = IMAGE_RULE_DEFAULT
+
     # ── 1단계: 스크립트 초안 생성 ─────────────────────
     msg = client.messages.create(
         model='claude-sonnet-4-6',
@@ -137,7 +179,9 @@ def generate_news_script(news_item: dict) -> dict:
             'content': NEWS_PROMPT.format(
                 title=news_item.get('title', ''),
                 source=news_item.get('source', ''),
-                summary=news_item.get('summary', news_item.get('title', ''))
+                summary=news_item.get('summary', news_item.get('title', '')),
+                category=category,
+                image_rule=image_rule,
             )
         }]
     )

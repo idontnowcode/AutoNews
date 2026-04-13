@@ -260,7 +260,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 
     <!-- 수집 옵션 -->
     <div class="card" style="margin-bottom:10px;padding:12px 14px">
-      <div style="font-size:11px;color:#888;margin-bottom:8px;font-weight:600">수집 옵션</div>
+      <div style="font-size:11px;color:#888;margin-bottom:10px;font-weight:600">수집 옵션</div>
+
+      <!-- 분야 선택 -->
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;color:#666;margin-bottom:6px">수집 분야</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px" id="newsCategoryBtns">
+          <!-- JS로 렌더링 -->
+        </div>
+      </div>
+
+      <!-- 건수 + 삭제 -->
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <div style="display:flex;align-items:center;gap:6px">
           <span style="font-size:12px;color:#aaa">피드당 최대</span>
@@ -707,13 +717,42 @@ async function triggerNewsFetch() {
   }
 }
 
+var NEWS_CATEGORIES = ['경제','스포츠','IT/테크','정치','사회','국제'];
+var _selectedCategories = ['경제'];
+
+function renderCategoryBtns() {
+  var el = document.getElementById('newsCategoryBtns');
+  if (!el) return;
+  el.innerHTML = NEWS_CATEGORIES.map(function(cat) {
+    var active = _selectedCategories.indexOf(cat) >= 0;
+    return '<button onclick="toggleNewsCategory(\''+cat+'\')" data-cat="'+cat+'" '+
+      'style="font-size:11px;padding:4px 10px;border-radius:20px;cursor:pointer;'+
+      'border:1px solid '+(active?'#FFD60A55':'#ffffff20')+';'+
+      'background:'+(active?'#FFD60A22':'transparent')+';'+
+      'color:'+(active?'#FFD60A':'#888')+'">'+cat+'</button>';
+  }).join('');
+}
+
+function toggleNewsCategory(cat) {
+  var idx = _selectedCategories.indexOf(cat);
+  if (idx >= 0) {
+    if (_selectedCategories.length === 1) { toast('최소 1개 분야는 선택해야 합니다'); return; }
+    _selectedCategories.splice(idx, 1);
+  } else {
+    _selectedCategories.push(cat);
+  }
+  renderCategoryBtns();
+  saveNewsSettings();
+}
+
 async function saveNewsSettings() {
   if (!sb) return;
   var maxPerFeed  = document.getElementById('newsMaxPerFeed').value  || '5';
   var deleteDays  = document.getElementById('newsDeleteDays').value  || '0';
   var pairs = [
-    { key: 'news_max_per_feed', value: maxPerFeed },
-    { key: 'news_delete_days',  value: deleteDays },
+    { key: 'news_max_per_feed',  value: maxPerFeed },
+    { key: 'news_delete_days',   value: deleteDays },
+    { key: 'news_categories',    value: _selectedCategories.join(',') },
   ];
   for (var p of pairs) {
     var exist = await sb.from('settings').select('key').eq('key', p.key);
@@ -728,8 +767,9 @@ async function saveNewsSettings() {
 
 async function loadNewsSettings() {
   if (!sb) return;
-  var res = await sb.from('settings').select('key,value').in('key', ['news_max_per_feed','news_delete_days']);
-  if (res.error || !res.data) return;
+  var res = await sb.from('settings').select('key,value')
+    .in('key', ['news_max_per_feed','news_delete_days','news_categories']);
+  if (res.error || !res.data) { renderCategoryBtns(); return; }
   res.data.forEach(function(r) {
     if (r.key === 'news_max_per_feed') {
       var el = document.getElementById('newsMaxPerFeed');
@@ -739,7 +779,11 @@ async function loadNewsSettings() {
       var el = document.getElementById('newsDeleteDays');
       if (el) el.value = r.value;
     }
+    if (r.key === 'news_categories' && r.value) {
+      _selectedCategories = r.value.split(',').map(function(c){ return c.trim(); }).filter(Boolean);
+    }
   });
+  renderCategoryBtns();
 }
 
 async function manualDeleteOldNews() {

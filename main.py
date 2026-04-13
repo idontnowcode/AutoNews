@@ -60,7 +60,7 @@ def main():
         # ── 6. YouTube 업로드 ──────────────────────────────
         print('📤 YouTube 업로드 중...')
         try:
-            video_id = upload_shorts(video_path, script)
+            video_id = upload_shorts(video_path, script, youtube_title_prefix='[일분 경제] ')
         except Exception as e:
             err = str(e)
             print(f'❌ 업로드 실패: {err}')

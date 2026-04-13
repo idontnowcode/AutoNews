@@ -27,11 +27,16 @@ def _get_youtube_client():
     return build('youtube', 'v3', credentials=creds)
 
 
-def upload_shorts(video_path: str, script_data: dict) -> str:
-    """YouTube Shorts 업로드 → 영상 ID 반환"""
+def upload_shorts(video_path: str, script_data: dict,
+                  youtube_title_prefix: str = '') -> str:
+    """YouTube Shorts 업로드 → 영상 ID 반환
+    youtube_title_prefix: 영상 속 제목과 별개로 유튜브 업로드 제목 앞에 붙는 태그
+                          예) '[일분 경제] ', '[일분 뉴스] '
+    """
     youtube = _get_youtube_client()
 
-    title       = script_data['title'][:100]
+    raw_title   = script_data['title']
+    yt_title    = f"{youtube_title_prefix}{raw_title}"[:100]
     hashtags    = ' '.join([f'#{t}' for t in script_data.get('hashtags', [])])
     description = f"{script_data.get('description', '')}\n\n{hashtags} #Shorts"
 
@@ -39,10 +44,10 @@ def upload_shorts(video_path: str, script_data: dict) -> str:
         part='snippet,status',
         body={
             'snippet': {
-                'title':           title,
+                'title':           yt_title,
                 'description':     description,
-                'tags':            script_data.get('hashtags', []) + ['Shorts', '뉴스'],
-                'categoryId':      '25',     # News & Politics
+                'tags':            script_data.get('hashtags', []) + ['Shorts'],
+                'categoryId':      '25',
                 'defaultLanguage': 'ko',
             },
             'status': {
