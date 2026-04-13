@@ -49,7 +49,7 @@ PROMPT_TEMPLATE = '''
 
 [출력 형식 — 반드시 아래 JSON만 반환, segments 배열 길이는 6~8]
 {{
-    "title": "반드시 이 형식 그대로: '주제명' 이란?  예) '금리' 이란?  '인플레이션' 이란?",
+    "title": "받침 없으면 '란?', 받침 있으면 '이란?' 사용. 예) '금리'란? / '주식'이란? / '인플레이션'이란? / 'GDP'란?",
     "description": "유튜브 설명문 (150자 이내) — 'nn초', 'X분', '1분 만에', '60초 안에' 등 시간 표현 절대 사용 금지",
     "hashtags": ["경제", "경제교육", "재테크", "주제태그1", "주제태그2"],
     "segments": [
@@ -61,6 +61,22 @@ PROMPT_TEMPLATE = '''
     ]
 }}
 '''
+
+
+def fix_title_grammar(title: str) -> str:
+    """'주제명'(이)란? — 받침 유무에 따라 이란/란 자동 교정"""
+    m = re.search(r"['\u2018\u2019\u201c\u201d](.+?)['\u2018\u2019\u201c\u201d]", title)
+    if not m:
+        return title
+    topic = m.group(1).strip()
+    last  = topic[-1] if topic else ''
+    code  = ord(last)
+    if 0xAC00 <= code <= 0xD7A3:          # 한글
+        jongseong = (code - 0xAC00) % 28
+        suffix = '란?' if jongseong == 0 else '이란?'
+    else:                                  # 영문/숫자 등
+        suffix = '란?' if last.lower() in 'aeiou' else '이란?'
+    return f"'{topic}'{suffix}"
 
 
 def extract_json(raw: str) -> dict:
@@ -85,4 +101,7 @@ def generate_script(topic: dict) -> dict:
             )
         }]
     )
-    return extract_json(msg.content[0].text.strip())
+    result = extract_json(msg.content[0].text.strip())
+    if 'title' in result:
+        result['title'] = fix_title_grammar(result['title'])
+    return result

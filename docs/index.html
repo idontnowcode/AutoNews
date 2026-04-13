@@ -628,7 +628,7 @@ async function loadCurriculum() {
   var next = topics.find(function(t){return t.status==='pending'});
   if (next) {
     document.getElementById('nextCard').style.display = 'block';
-    document.getElementById('nextTitle').textContent = "'"+next.title+"' 이란?";
+    document.getElementById('nextTitle').textContent = eiran(next.title);
     document.getElementById('nextMeta').textContent = next.category+' · '+lvl(next.level)+' · #'+next.order_index;
   }
 
@@ -886,6 +886,18 @@ async function triggerNext() {
 }
 
 // ── 유틸 ─────────────────────────────────────────
+function eiran(title) {
+  if (!title) return title;
+  var last = title[title.length - 1];
+  var code = last.charCodeAt(0);
+  var suffix;
+  if (code >= 0xAC00 && code <= 0xD7A3) {        // 한글
+    suffix = (code - 0xAC00) % 28 === 0 ? '란?' : '이란?';
+  } else {                                         // 영문/숫자
+    suffix = 'aeiouAEIOU'.indexOf(last) >= 0 ? '란?' : '이란?';
+  }
+  return "'" + title + "'" + suffix;
+}
 function lvl(l) { return l==='basic'?'기초':l==='intermediate'?'중급':'심화'; }
 function fmtDate(iso) {
   if (!iso) return '';
