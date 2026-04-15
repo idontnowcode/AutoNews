@@ -588,19 +588,49 @@ async function loadAutoSettingsForHeader() {
   var s = {};
   res.data.forEach(function(r){ s[r.key] = r.value; });
   var enabled = s['auto_enabled'] !== 'false';
-  updateAutoHeaderBadge(enabled, s['interval_value'] || '1', s['interval_unit'] || 'days');
+  updateAutoHeaderBadge(enabled, s['interval_value'] || '1', s['interval_unit'] || 'days', s['auto_enabled_at'] || null);
 }
 
-function updateAutoHeaderBadge(enabled, val, unit) {
+var _autoVal = '1', _autoUnit = 'days', _autoEnabledAt = null, _autoTimer = null;
+
+function updateAutoHeaderBadge(enabled, val, unit, enabledAt) {
+  _autoVal = val || '1'; _autoUnit = unit || 'days';
+  if (enabledAt) _autoEnabledAt = new Date(enabledAt);
+  _syncHeaderToggle(enabled);
+  _renderAutoBadge(enabled);
+  // 1분마다 남은 시간 갱신
+  if (_autoTimer) clearInterval(_autoTimer);
+  if (enabled) _autoTimer = setInterval(function(){ _renderAutoBadge(true); }, 60000);
+}
+
+function _renderAutoBadge(enabled) {
   var sub = document.getElementById('headerSub');
   if (!sub) return;
-  var current = sub.textContent.replace(/\s*·\s*(🟢|🔴).*/,'');
-  var badge = enabled
-    ? ' · 🟢 ' + val + (unit==='hours' ? '시간' : '일') + '마다'
-    : ' · 🔴 자동OFF';
-  sub.textContent = current + badge;
-  // 헤더 토글 동기화
-  _syncHeaderToggle(enabled);
+  var base = sub.textContent.replace(/\s*·\s*(🟢|🔴).*/,'');
+  if (!enabled) { sub.textContent = base + ' · 🔴 자동OFF'; return; }
+
+  var intervalMs = parseInt(_autoVal) * (_autoUnit === 'hours' ? 3600000 : 86400000);
+  var badge = ' · 🟢 ' + _autoVal + (_autoUnit === 'hours' ? '시간' : '일') + '마다';
+
+  if (_autoEnabledAt && intervalMs > 0) {
+    var now = Date.now();
+    var elapsed = now - _autoEnabledAt.getTime();
+    var n = Math.ceil(elapsed / intervalMs);
+    if (n < 1) n = 1;
+    var nextTs = _autoEnabledAt.getTime() + n * intervalMs;
+    var diff   = nextTs - now;
+    if (diff < 0) diff = 0;
+    var dh = Math.floor(diff / 3600000);
+    var dm = Math.floor((diff % 3600000) / 60000);
+    var nextDate = new Date(nextTs);
+    var mm = String(nextDate.getMonth()+1).padStart(2,'0');
+    var dd = String(nextDate.getDate()).padStart(2,'0');
+    var hh = String(nextDate.getHours()).padStart(2,'0');
+    var mi = String(nextDate.getMinutes()).padStart(2,'0');
+    badge += ' · 다음 ' + mm+'/'+dd+' '+hh+':'+mi
+           + ' (' + (dh > 0 ? dh+'h ' : '') + dm+'m 후)';
+  }
+  sub.textContent = base + badge;
 }
 
 function _syncHeaderToggle(enabled) {
@@ -618,12 +648,18 @@ function _syncHeaderToggle(enabled) {
 async function toggleHeaderAuto() {
   if (!sb) { toast('⚙️ 먼저 Supabase 연결이 필요합니다'); return; }
   var enabled = document.getElementById('headerAutoEnabled').checked;
-  _syncHeaderToggle(enabled);
   // 모달 내 체크박스도 동기화
   var modalCb = document.getElementById('cfgAutoEnabled');
   if (modalCb) { modalCb.checked = enabled; updateAutoToggleUI(enabled); }
-  // DB 저장
-  await sb.from('settings').upsert({ key: 'auto_enabled', value: String(enabled) }, { onConflict: 'key' });
+  // ON 시 현재 시각을 기준 시각으로 저장
+  var rows = [{ key: 'auto_enabled', value: String(enabled) }];
+  if (enabled) {
+    var now = new Date().toISOString();
+    rows.push({ key: 'auto_enabled_at', value: now });
+    _autoEnabledAt = new Date(now);
+  }
+  for (var r of rows) await sb.from('settings').upsert(r, { onConflict: 'key' });
+  updateAutoHeaderBadge(enabled, _autoVal, _autoUnit, enabled ? _autoEnabledAt.toISOString() : null);
   toast(enabled ? '🟢 자동 업로드 ON' : '🔴 자동 업로드 OFF');
 }
 
