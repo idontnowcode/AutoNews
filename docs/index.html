@@ -304,13 +304,18 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
       </div>
     </div>
 
-    <!-- 필터 -->
-    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
-      <button onclick="loadNews('all')"         id="nfAll"        style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;cursor:pointer">전체</button>
-      <button onclick="loadNews('pending')"     id="nfPending"    style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">대기</button>
+    <!-- 상태 필터 -->
+    <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">
+      <button onclick="loadNews('all')"         id="nfAll"         style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;cursor:pointer">전체</button>
+      <button onclick="loadNews('pending')"     id="nfPending"     style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">대기</button>
       <button onclick="loadNews('in_progress')" id="nfIn_progress" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">진행중</button>
-      <button onclick="loadNews('failed')"      id="nfFailed"     style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">실패</button>
-      <button onclick="loadNews('done')"        id="nfDone"       style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">완료</button>
+      <button onclick="loadNews('failed')"      id="nfFailed"      style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">실패</button>
+      <button onclick="loadNews('done')"        id="nfDone"        style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">완료</button>
+    </div>
+    <!-- 분야 필터 -->
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap" id="nfCatRow">
+      <button onclick="filterNewsCat('all')" id="ncAll" style="font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid #ffffff40;background:#ffffff18;color:#ccc;cursor:pointer">전체 분야</button>
+      <!-- 나머지는 JS로 렌더링 -->
     </div>
 
     <div class="card" id="newsContainer">
@@ -634,13 +639,46 @@ function showTab(n) {
 }
 
 // ── 뉴스 ─────────────────────────────────────────
-var _newsFilter = 'all';
+var _newsFilter    = 'all';
+var _newsCatFilter = 'all';
+
+function renderCatFilterBtns() {
+  var row = document.getElementById('nfCatRow');
+  if (!row) return;
+  var cats = NEWS_CATEGORIES;
+  var extra = cats.map(function(cat) {
+    var active = cat === _newsCatFilter;
+    return '<button onclick="filterNewsCat(\''+cat+'\')" id="nc'+cat+'" '+
+      'style="font-size:11px;padding:3px 9px;border-radius:20px;cursor:pointer;'+
+      'border:1px solid '+(active?'#FFD60A55':'#ffffff25')+';'+
+      'background:'+(active?'#FFD60A22':'transparent')+';'+
+      'color:'+(active?'#FFD60A':'#888')+'">'+cat+'</button>';
+  }).join('');
+  // 전체 분야 버튼 스타일
+  var allBtn = document.getElementById('ncAll');
+  if (allBtn) {
+    var allActive = _newsCatFilter === 'all';
+    allBtn.style.background   = allActive ? '#FFD60A22' : '#ffffff18';
+    allBtn.style.color        = allActive ? '#FFD60A'   : '#ccc';
+    allBtn.style.borderColor  = allActive ? '#FFD60A55' : '#ffffff40';
+  }
+  // 기존 분야 버튼 제거 후 재삽입
+  var existing = row.querySelectorAll('[id^="nc"]:not(#ncAll)');
+  existing.forEach(function(el){ el.remove(); });
+  row.insertAdjacentHTML('beforeend', extra);
+}
+
+function filterNewsCat(cat) {
+  _newsCatFilter = cat;
+  renderCatFilterBtns();
+  loadNews(_newsFilter);
+}
 
 async function loadNews(filter) {
   if (!sb) return;
   _newsFilter = filter || 'all';
 
-  // 필터 버튼 스타일
+  // 상태 필터 버튼 스타일
   ['all','pending','in_progress','failed','done'].forEach(function(f) {
     var btn = document.getElementById('nf' + f.charAt(0).toUpperCase() + f.slice(1));
     if (!btn) return;
@@ -651,8 +689,9 @@ async function loadNews(filter) {
   });
 
   var query = sb.from('news_items').select('id,title,source,status,youtube_id,published_at,created_at,category')
-                .order('published_at', {ascending: false}).limit(50);
-  if (_newsFilter !== 'all') query = query.eq('status', _newsFilter);
+                .order('published_at', {ascending: false}).limit(100);
+  if (_newsFilter !== 'all')    query = query.eq('status',   _newsFilter);
+  if (_newsCatFilter !== 'all') query = query.eq('category', _newsCatFilter);
 
   var res = await query;
   if (res.error) { toast('오류: ' + res.error.message); return; }
@@ -808,7 +847,7 @@ async function loadNewsSettings() {
   if (!sb) return;
   var res = await sb.from('settings').select('key,value')
     .in('key', ['news_max_per_feed','news_delete_days','news_categories']);
-  if (res.error || !res.data) { renderCategoryBtns(); return; }
+  if (res.error || !res.data) { renderCategoryBtns(); renderCatFilterBtns(); return; }
   res.data.forEach(function(r) {
     if (r.key === 'news_max_per_feed') {
       var el = document.getElementById('newsMaxPerFeed');
@@ -823,6 +862,7 @@ async function loadNewsSettings() {
     }
   });
   renderCategoryBtns();
+  renderCatFilterBtns();
 }
 
 async function manualDeleteOldNews() {
