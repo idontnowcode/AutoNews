@@ -140,7 +140,19 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
     <div class="header-title">일분 스튜디오</div>
     <div class="header-sub" id="headerSub">연결 대기 중...</div>
   </div>
-  <button class="btn-gear" onclick="openModal()">⚙️</button>
+  <div style="display:flex;align-items:center;gap:10px">
+    <!-- 자동 업로드 토글 -->
+    <div style="display:flex;align-items:center;gap:6px">
+      <span id="autoToggleLabel" style="font-size:11px;color:#555">자동</span>
+      <label style="position:relative;width:40px;height:22px;cursor:pointer" title="자동 업로드 ON/OFF">
+        <input type="checkbox" id="headerAutoEnabled" style="opacity:0;width:0;height:0" onchange="toggleHeaderAuto()">
+        <span id="headerAutoTrack" style="position:absolute;inset:0;background:#ffffff20;border-radius:11px;transition:.25s">
+          <span id="headerAutoKnob" style="position:absolute;left:2px;top:2px;width:18px;height:18px;background:#555;border-radius:50%;transition:.25s"></span>
+        </span>
+      </label>
+    </div>
+    <button class="btn-gear" onclick="openModal()">⚙️</button>
+  </div>
 </div>
 
 <!-- 생성 중 배너 (전역, 항상 표시) -->
@@ -151,8 +163,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 
 <!-- 탭 -->
 <div class="tabs" style="overflow-x:auto;flex-wrap:nowrap">
-  <button class="tab-btn active" id="tabBtn0" onclick="showTab(0)">📚 커리큘럼</button>
-  <button class="tab-btn" id="tabBtn1" onclick="showTab(1)">🎬 영상 요청</button>
+  <button class="tab-btn" id="tabBtn0" onclick="showTab(0)" style="opacity:0.35;pointer-events:none" title="준비 중">📚 커리큘럼</button>
+  <button class="tab-btn active" id="tabBtn1" onclick="showTab(1)">🎬 영상 요청</button>
   <button class="tab-btn" id="tabBtn2" onclick="showTab(2)">📋 히스토리</button>
   <button class="tab-btn" id="tabBtn3" onclick="showTab(3)">📰 뉴스</button>
   <button class="tab-btn" id="tabBtn4" onclick="showTab(4)">💰 비용</button>
@@ -582,6 +594,32 @@ function updateAutoHeaderBadge(enabled, val, unit) {
     ? ' · 🟢 ' + val + (unit==='hours' ? '시간' : '일') + '마다'
     : ' · 🔴 자동OFF';
   sub.textContent = current + badge;
+  // 헤더 토글 동기화
+  _syncHeaderToggle(enabled);
+}
+
+function _syncHeaderToggle(enabled) {
+  var cb     = document.getElementById('headerAutoEnabled');
+  var track  = document.getElementById('headerAutoTrack');
+  var knob   = document.getElementById('headerAutoKnob');
+  var label  = document.getElementById('autoToggleLabel');
+  if (!cb) return;
+  cb.checked = enabled;
+  if (track) track.style.background = enabled ? '#FFD60A88' : '#ffffff20';
+  if (knob)  { knob.style.background = enabled ? '#FFD60A' : '#555'; knob.style.left = enabled ? '20px' : '2px'; }
+  if (label) { label.style.color = enabled ? '#FFD60A' : '#555'; }
+}
+
+async function toggleHeaderAuto() {
+  if (!sb) { toast('⚙️ 먼저 Supabase 연결이 필요합니다'); return; }
+  var enabled = document.getElementById('headerAutoEnabled').checked;
+  _syncHeaderToggle(enabled);
+  // 모달 내 체크박스도 동기화
+  var modalCb = document.getElementById('cfgAutoEnabled');
+  if (modalCb) { modalCb.checked = enabled; updateAutoToggleUI(enabled); }
+  // DB 저장
+  await sb.from('settings').upsert({ key: 'auto_enabled', value: String(enabled) }, { onConflict: 'key' });
+  toast(enabled ? '🟢 자동 업로드 ON' : '🔴 자동 업로드 OFF');
 }
 
 // ── 탭 ───────────────────────────────────────────
@@ -1206,8 +1244,9 @@ loadCfg();
 // 저장된 탭 복원
 (function() {
   var savedTab = 0;
-  try { savedTab = parseInt(localStorage.getItem('ibbun_tab') || '0'); } catch(e) {}
-  if (isNaN(savedTab) || savedTab < 0 || savedTab > 4) savedTab = 0;
+  try { savedTab = parseInt(localStorage.getItem('ibbun_tab') || '1'); } catch(e) {}
+  if (isNaN(savedTab) || savedTab < 0 || savedTab > 4) savedTab = 1;
+  if (savedTab === 0) savedTab = 1; // 커리큘럼 비활성화 중
   showTab(savedTab);
 })();
 if (cfg.url && cfg.key) {
