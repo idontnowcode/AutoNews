@@ -259,6 +259,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <div style="font-size:13px;font-weight:700;color:#FFD60A">📰 경제 뉴스 Shorts</div>
       <div style="display:flex;gap:6px">
+        <button onclick="deleteAllNews()"
+          style="font-size:12px;padding:6px 12px;background:#ef444418;color:#ef4444;font-weight:600;border-radius:8px;border:1px solid #ef444440;cursor:pointer">
+          🗑️ 전체 삭제
+        </button>
         <button onclick="triggerNewsFetch()" id="newsFetchBtn"
           style="font-size:12px;padding:6px 12px;background:#ffffff18;color:#ccc;font-weight:600;border-radius:8px;border:1px solid #ffffff30;cursor:pointer">
           📥 수집
@@ -795,6 +799,15 @@ async function deleteNews(id) {
   var res = await sb.from('news_items').delete().eq('id', id);
   if (res.error) { toast('오류: ' + res.error.message); return; }
   toast('🗑️ 삭제됨');
+  loadNews(_newsFilter);
+}
+
+async function deleteAllNews() {
+  if (!confirm('수집된 뉴스를 전체 삭제하시겠습니까?\n(done/failed 포함 모든 항목)')) return;
+  if (!sb) return;
+  var res = await sb.from('news_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  if (res.error) { toast('오류: ' + res.error.message); return; }
+  toast('🗑️ 전체 삭제 완료');
   loadNews(_newsFilter);
 }
 
