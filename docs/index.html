@@ -886,11 +886,17 @@ async function loadCostStats() {
     return;
   }
 
-  var res = await sb.from('videos').select('created_at,script_json,slide_prompts').order('created_at', {ascending: false}).limit(200);
-  if (res.error) { toast('오류: ' + res.error.message); return; }
-  var vids = res.data || [];
+  // 커리큘럼 + 뉴스 병렬 조회
+  var [resV, resN] = await Promise.all([
+    sb.from('videos').select('created_at,script_json,slide_prompts').order('created_at', {ascending: false}).limit(200),
+    sb.from('news_items').select('created_at').eq('status','done').order('created_at', {ascending: false}).limit(200)
+  ]);
 
-  if (!vids.length) {
+  var currVids = (resV.data || []).map(function(v){ return { created_at: v.created_at, segs: _extractSegs(v), type: '커리큘럼' }; });
+  var newsVids = (resN.data || []).map(function(v){ return { created_at: v.created_at, segs: 7, type: '뉴스' }; });
+  var allVids  = currVids.concat(newsVids).sort(function(a,b){ return new Date(b.created_at)-new Date(a.created_at); });
+
+  if (!allVids.length) {
     document.getElementById('costStatBody').innerHTML = '<div>아직 생성된 영상이 없습니다</div>';
     ['costWeekTotal','costWeekSub','costMonTotal','costMonSub','costMonClaude','costMonImg','costMonTts'].forEach(function(id){ document.getElementById(id).textContent = '-'; });
     return;
@@ -898,30 +904,20 @@ async function loadCostStats() {
 
   var now = Date.now();
   var weekMs = 7*24*60*60*1000, monMs = 30*24*60*60*1000;
-  var weekVids = vids.filter(function(v){ return now - new Date(v.created_at).getTime() <= weekMs; });
-  var monVids  = vids.filter(function(v){ return now - new Date(v.created_at).getTime() <= monMs; });
+  var weekVids = allVids.filter(function(v){ return now - new Date(v.created_at).getTime() <= weekMs; });
+  var monVids  = allVids.filter(function(v){ return now - new Date(v.created_at).getTime() <= monMs; });
 
-  // 평균 세그먼트 수
   function avgSegs(arr) {
     if (!arr.length) return 7;
-    var total = arr.reduce(function(s, v) {
-      var n = 0;
-      if (v.slide_prompts && Array.isArray(v.slide_prompts)) n = v.slide_prompts.length;
-      else if (v.script_json) {
-        try { var j = typeof v.script_json === 'string' ? JSON.parse(v.script_json) : v.script_json;
-              n = (j.segments || j).length; } catch(e) {}
-      }
-      return s + (n || 7);
-    }, 0);
-    return Math.round(total / arr.length);
+    return Math.round(arr.reduce(function(s,v){ return s + v.segs; }, 0) / arr.length);
   }
 
-  var wSegs = avgSegs(weekVids.length ? weekVids : vids);
-  var mSegs = avgSegs(monVids.length ? monVids : vids);
-  var wCnt  = weekVids.length || Math.round(vids.length / Math.max(1, Math.ceil((now - new Date(vids[vids.length-1].created_at).getTime()) / weekMs)));
-  var mCnt  = monVids.length  || Math.round(vids.length / Math.max(1, Math.ceil((now - new Date(vids[vids.length-1].created_at).getTime()) / monMs)));
+  var wSegs = avgSegs(weekVids.length ? weekVids : allVids);
+  var mSegs = avgSegs(monVids.length ? monVids : allVids);
+  var wCnt  = weekVids.length || Math.round(allVids.length / Math.max(1, Math.ceil((now - new Date(allVids[allVids.length-1].created_at).getTime()) / weekMs)));
+  var mCnt  = monVids.length  || Math.round(allVids.length / Math.max(1, Math.ceil((now - new Date(allVids[allVids.length-1].created_at).getTime()) / monMs)));
 
-  var IMG_PRICE = 0.042;
+  var IMG_PRICE = 0.011;  // low quality
   var CLAUDE_PER = (500/1e6)*3 + (1500/1e6)*15;
   var FREE_LIMIT = 10000, STARTER_LIMIT = 30000;
 
@@ -936,21 +932,26 @@ async function loadCostStats() {
   var w = calcCosts(wCnt, wSegs);
   var m = calcCosts(mCnt, mSegs);
 
-  // 요약 카드
-  var oldestDate = fmtDate(vids[vids.length-1].created_at);
+  // 커리큘럼 / 뉴스 분류 카운트
+  var cCnt = currVids.length, nCnt = newsVids.length;
+  var oldestDate = fmtDate(allVids[allVids.length-1].created_at);
+
   document.getElementById('costStatBody').innerHTML =
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center">' +
-    '<div><div style="font-size:22px;font-weight:700;color:#FFD60A">'+vids.length+'</div><div style="font-size:11px;color:#666;margin-top:2px">총 생성</div></div>' +
+    '<div><div style="font-size:22px;font-weight:700;color:#FFD60A">'+allVids.length+'</div><div style="font-size:11px;color:#666;margin-top:2px">총 생성</div></div>' +
     '<div><div style="font-size:22px;font-weight:700;color:#60a5fa">'+wCnt+'</div><div style="font-size:11px;color:#666;margin-top:2px">주간 평균</div></div>' +
     '<div><div style="font-size:22px;font-weight:700;color:#a78bfa">'+mCnt+'</div><div style="font-size:11px;color:#666;margin-top:2px">월간 평균</div></div>' +
     '</div>' +
-    '<div style="margin-top:12px;font-size:11px;color:#555">평균 세그먼트 '+mSegs+'개 / 영상 &nbsp;·&nbsp; 첫 생성 '+oldestDate+'</div>';
+    '<div style="display:flex;gap:8px;justify-content:center;margin-top:10px">' +
+    '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#ffffff10;color:#aaa">📚 커리큘럼 '+cCnt+'개</span>' +
+    '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#ffffff10;color:#aaa">📰 뉴스 '+nCnt+'개</span>' +
+    '</div>' +
+    '<div style="margin-top:8px;font-size:11px;color:#555">평균 세그먼트 '+mSegs+'개 / 영상 &nbsp;·&nbsp; 첫 생성 '+oldestDate+'</div>';
 
   document.getElementById('costWeekTotal').textContent = '$' + w.total.toFixed(2);
   document.getElementById('costWeekSub').textContent   = wCnt + '개 영상 · 세그먼트 ' + wSegs + '개 평균';
   document.getElementById('costMonTotal').textContent  = '$' + m.total.toFixed(2);
   document.getElementById('costMonSub').textContent    = mCnt + '개 영상 · 세그먼트 ' + mSegs + '개 평균';
-
   document.getElementById('costMonClaude').textContent = '$' + m.claude.toFixed(2);
   document.getElementById('costMonImg').textContent    = '$' + m.img.toFixed(2);
   document.getElementById('costMonImgSub').textContent = mSegs + '장 × $' + IMG_PRICE + ' × ' + mCnt + '영상';
@@ -961,6 +962,17 @@ async function loadCostStats() {
   bar.style.background = pct < 70 ? '#4ade80' : pct < 100 ? '#fb923c' : '#f87171';
   document.getElementById('ttsBarLabel').textContent = m.chars.toLocaleString() + ' / 10,000자' + (m.chars > FREE_LIMIT ? ' (초과)' : '');
   document.getElementById('costMonTts').textContent = m.tts === 0 ? '$0 (무료)' : '$' + m.tts + ' (Starter)';
+}
+
+function _extractSegs(v) {
+  if (v.slide_prompts && Array.isArray(v.slide_prompts)) return v.slide_prompts.length;
+  if (v.script_json) {
+    try {
+      var j = typeof v.script_json === 'string' ? JSON.parse(v.script_json) : v.script_json;
+      return (j.segments || j).length || 7;
+    } catch(e) {}
+  }
+  return 7;
 }
 
 // ── 커리큘럼 ──────────────────────────────────────
