@@ -1,8 +1,13 @@
 """
-YouTube Data API로 업로드된 모든 영상의 통계 수집 → Supabase video_stats upsert
-- videos 테이블 (커리큘럼) + news_items 테이블 (뉴스) 의 youtube_id 수집
-- videos.list(part='statistics,contentDetails') 배치 호출 (최대 50개/요청)
-- video_stats 테이블에 upsert (youtube_id 기준)
+YouTube 채널의 업로드 플레이리스트에서 모든 영상을 직접 가져와 통계 수집.
+Supabase DB는 video_type/category 보강용으로만 사용.
+
+흐름:
+  1. channels.list(mine=True) → uploads 플레이리스트 ID
+  2. playlistItems.list(페이지네이션) → 전체 영상 ID 목록
+  3. videos.list(part=statistics,contentDetails,snippet) → 실제 통계
+  4. Supabase videos/news_items 로 video_type/category 보강
+  5. video_stats 테이블 upsert
 """
 import os
 import json
@@ -36,142 +41,196 @@ def _parse_duration(iso: str) -> int:
     return h * 3600 + mi * 60 + s
 
 
-def fetch_all_video_ids() -> list[dict]:
+def _get_uploads_playlist_id(youtube) -> str:
+    """내 채널의 uploads 플레이리스트 ID 반환"""
+    res = youtube.channels().list(
+        part='contentDetails',
+        mine=True
+    ).execute()
+    items = res.get('items', [])
+    if not items:
+        raise RuntimeError('채널 정보를 가져올 수 없습니다.')
+    return items[0]['contentDetails']['relatedPlaylists']['uploads']
+
+
+def _fetch_all_playlist_items(youtube, playlist_id: str) -> list[str]:
+    """플레이리스트의 모든 영상 ID 페이지네이션 수집"""
+    video_ids = []
+    next_page = None
+
+    while True:
+        kwargs = dict(
+            part='contentDetails',
+            playlistId=playlist_id,
+            maxResults=50,
+        )
+        if next_page:
+            kwargs['pageToken'] = next_page
+
+        res = youtube.playlistItems().list(**kwargs).execute()
+        for item in res.get('items', []):
+            vid_id = item['contentDetails'].get('videoId')
+            if vid_id:
+                video_ids.append(vid_id)
+
+        next_page = res.get('nextPageToken')
+        if not next_page:
+            break
+
+    return video_ids
+
+
+def _fetch_video_details(youtube, video_ids: list[str]) -> dict:
     """
-    Supabase에서 모든 youtube_id 수집.
-    반환: [{'youtube_id', 'title', 'video_type', 'category', 'published_at'}, ...]
+    videos.list로 통계 + snippet 수집.
+    반환: {
+      youtube_id: {
+        'title', 'published_at',
+        'view_count', 'like_count', 'comment_count', 'duration_sec'
+      }
+    }
     """
-    db = get_client()
-    results = []
-
-    # 커리큘럼 영상
-    res = db.table('videos') \
-            .select('youtube_id, title, created_at, script_json') \
-            .not_.is_('youtube_id', 'null') \
-            .execute()
-    for r in (res.data or []):
-        category = '커리큘럼'
-        sj = r.get('script_json') or {}
-        if isinstance(sj, str):
-            try: sj = json.loads(sj)
-            except Exception: sj = {}
-        if sj.get('category'):
-            category = sj['category']
-        results.append({
-            'youtube_id':  r['youtube_id'],
-            'title':       r.get('title', ''),
-            'video_type':  'curriculum',
-            'category':    category,
-            'published_at': r.get('created_at'),
-        })
-
-    # 뉴스 영상
-    res = db.table('news_items') \
-            .select('youtube_id, title, created_at, category') \
-            .not_.is_('youtube_id', 'null') \
-            .eq('status', 'done') \
-            .execute()
-    for r in (res.data or []):
-        results.append({
-            'youtube_id':  r['youtube_id'],
-            'title':       r.get('title', ''),
-            'video_type':  'news',
-            'category':    r.get('category', '뉴스'),
-            'published_at': r.get('created_at'),
-        })
-
-    return results
-
-
-def fetch_stats_from_youtube(video_ids: list[str]) -> dict:
-    """
-    YouTube API로 통계 조회.
-    반환: {youtube_id: {'view_count', 'like_count', 'comment_count', 'duration_sec'}}
-    """
-    if not video_ids:
-        return {}
-    youtube = _get_youtube_client()
-    stats = {}
-
-    # 50개씩 배치 처리
+    details = {}
     for i in range(0, len(video_ids), 50):
         batch = video_ids[i:i + 50]
-        response = youtube.videos().list(
-            part='statistics,contentDetails',
+        res = youtube.videos().list(
+            part='statistics,contentDetails,snippet',
             id=','.join(batch)
         ).execute()
 
-        for item in response.get('items', []):
-            vid_id = item['id']
-            s = item.get('statistics', {})
-            d = item.get('contentDetails', {})
-            stats[vid_id] = {
+        for item in res.get('items', []):
+            vid_id  = item['id']
+            snippet = item.get('snippet', {})
+            s       = item.get('statistics', {})
+            d       = item.get('contentDetails', {})
+
+            details[vid_id] = {
+                'title':         snippet.get('title', ''),
+                'published_at':  snippet.get('publishedAt'),
                 'view_count':    int(s.get('viewCount',    0)),
                 'like_count':    int(s.get('likeCount',    0)),
                 'comment_count': int(s.get('commentCount', 0)),
                 'duration_sec':  _parse_duration(d.get('duration', '')),
             }
 
-    return stats
+    return details
 
 
-def save_stats_to_db(video_meta: list[dict], yt_stats: dict) -> int:
+def _build_db_meta_map() -> dict:
+    """
+    Supabase에서 youtube_id → {video_type, category} 매핑 구성.
+    채널에는 있지만 DB에 없는 영상은 'unknown'으로 처리.
+    """
+    db = get_client()
+    meta = {}
+
+    # 커리큘럼
+    res = db.table('videos') \
+            .select('youtube_id, script_json') \
+            .not_.is_('youtube_id', 'null') \
+            .execute()
+    for r in (res.data or []):
+        yid = r.get('youtube_id')
+        if not yid:
+            continue
+        sj = r.get('script_json') or {}
+        if isinstance(sj, str):
+            try: sj = json.loads(sj)
+            except Exception: sj = {}
+        meta[yid] = {
+            'video_type': 'curriculum',
+            'category':   sj.get('category', '커리큘럼'),
+        }
+
+    # 뉴스
+    res = db.table('news_items') \
+            .select('youtube_id, category') \
+            .not_.is_('youtube_id', 'null') \
+            .eq('status', 'done') \
+            .execute()
+    for r in (res.data or []):
+        yid = r.get('youtube_id')
+        if not yid:
+            continue
+        meta[yid] = {
+            'video_type': 'news',
+            'category':   r.get('category', '뉴스'),
+        }
+
+    return meta
+
+
+def save_stats_to_db(records: list[dict]) -> int:
     """video_stats 테이블에 upsert. 저장 건수 반환."""
     db = get_client()
     saved = 0
     now = datetime.now(timezone.utc).isoformat()
 
-    for meta in video_meta:
-        yid = meta['youtube_id']
-        if yid not in yt_stats:
-            continue
-        s = yt_stats[yid]
+    for r in records:
         try:
             db.table('video_stats').upsert({
-                'youtube_id':    yid,
-                'title':         meta.get('title', ''),
-                'video_type':    meta.get('video_type', 'curriculum'),
-                'category':      meta.get('category', ''),
-                'view_count':    s['view_count'],
-                'like_count':    s['like_count'],
-                'comment_count': s['comment_count'],
-                'duration_sec':  s['duration_sec'],
-                'published_at':  meta.get('published_at'),
+                'youtube_id':    r['youtube_id'],
+                'title':         r.get('title', ''),
+                'video_type':    r.get('video_type', 'unknown'),
+                'category':      r.get('category', ''),
+                'view_count':    r.get('view_count', 0),
+                'like_count':    r.get('like_count', 0),
+                'comment_count': r.get('comment_count', 0),
+                'duration_sec':  r.get('duration_sec', 0),
+                'published_at':  r.get('published_at'),
                 'fetched_at':    now,
             }, on_conflict='youtube_id').execute()
             saved += 1
         except Exception as e:
-            print(f'   저장 실패 ({yid}): {e}')
+            print(f'   저장 실패 ({r.get("youtube_id")}): {e}')
 
     return saved
 
 
 def collect_all_stats() -> list[dict]:
     """
-    전체 파이프라인: DB에서 ID 수집 → YouTube API 조회 → DB upsert.
-    반환: 저장된 통계 레코드 리스트 (분석용)
+    전체 파이프라인:
+      채널 uploads 플레이리스트 → 전체 영상 ID
+      → YouTube API 통계/스니펫 수집
+      → Supabase 메타 보강
+      → video_stats upsert
+    반환: 분석용 레코드 리스트
     """
     print('📊 영상 통계 수집 시작...')
+    youtube = _get_youtube_client()
 
-    video_meta = fetch_all_video_ids()
-    print(f'   대상 영상: {len(video_meta)}개 (커리큘럼 {sum(1 for v in video_meta if v["video_type"]=="curriculum")}개 / '
-          f'뉴스 {sum(1 for v in video_meta if v["video_type"]=="news")}개)')
+    # 1. 채널 전체 영상 ID 수집
+    playlist_id = _get_uploads_playlist_id(youtube)
+    print(f'   업로드 플레이리스트: {playlist_id}')
 
-    if not video_meta:
+    video_ids = _fetch_all_playlist_items(youtube, playlist_id)
+    print(f'   채널 전체 영상: {len(video_ids)}개')
+
+    if not video_ids:
         print('   수집할 영상 없음')
         return []
 
-    yt_ids = [v['youtube_id'] for v in video_meta]
-    yt_stats = fetch_stats_from_youtube(yt_ids)
-    print(f'   YouTube API 응답: {len(yt_stats)}개')
+    # 2. 영상별 통계 + 제목/게시일 수집
+    details = _fetch_video_details(youtube, video_ids)
+    print(f'   YouTube API 통계 응답: {len(details)}개')
 
-    saved = save_stats_to_db(video_meta, yt_stats)
+    # 3. Supabase 메타 보강 (video_type, category)
+    db_meta = _build_db_meta_map()
+    db_matched = sum(1 for yid in details if yid in db_meta)
+    print(f'   DB 매칭: {db_matched}개 / 미매칭: {len(details) - db_matched}개 (채널 직접 업로드)')
+
+    # 4. 레코드 병합
+    records = []
+    for yid, det in details.items():
+        meta = db_meta.get(yid, {'video_type': 'unknown', 'category': '기타'})
+        records.append({
+            'youtube_id': yid,
+            **det,
+            **meta,
+        })
+
+    # 5. DB upsert
+    saved = save_stats_to_db(records)
     print(f'   DB 저장 완료: {saved}개')
 
-    # 분석용 merged 레코드 반환
-    merged = []
-    for meta in video_meta:
-        yid = meta['youtube_id']
-        if yid in yt_stats:
-            merged.append({**meta, **yt_stats[yid]})
-    return merged
+    return records

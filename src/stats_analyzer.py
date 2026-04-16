@@ -91,11 +91,18 @@ def _compute_summary(records: list[dict]) -> dict:
     recent_avg = round(sum(recent) / len(recent)) if recent else 0
     older_avg  = round(sum(older)  / len(older))  if older  else 0
 
+    # DB 매칭률
+    db_matched   = sum(1 for r in records if r.get('video_type') != 'unknown')
+    db_unmatched = total - db_matched
+
     return {
         'total_videos':  total,
+        'db_matched':    db_matched,
+        'db_unmatched':  db_unmatched,
         'avg_views':     round(avg_views),
         'max_views':     max(views),
         'min_views':     min(views),
+        'std_dev':       round((sum((v - avg_views) ** 2 for v in views) / total) ** 0.5) if total > 1 else 0,
         'category_avg':  cat_avg,
         'type_avg':      type_avg,
         'dow_avg':       dow_avg,
@@ -118,26 +125,30 @@ def generate_report(records: list[dict]) -> str:
     client = anthropic.Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
 
     prompt = f"""당신은 유튜브 채널 데이터 분석 전문가입니다.
-아래는 경제 교육 YouTube Shorts 채널의 영상 통계 요약입니다.
-이 데이터를 바탕으로 조회수가 들쭉날쭉한 원인을 분석하고, 개선 방향을 제시해주세요.
+아래는 경제 교육 YouTube Shorts 채널의 **채널 전체 영상** 통계 요약입니다.
+(YouTube 업로드 플레이리스트에서 직접 수집한 실제 데이터입니다.)
 
 ## 통계 요약
 ```json
 {json.dumps(summary, ensure_ascii=False, indent=2)}
 ```
 
+## 참고
+- `video_type`: curriculum(경제 교육), news(뉴스), unknown(DB 미등록 영상)
+- `std_dev`: 조회수 표준편차 — 클수록 편차가 심함
+- `db_unmatched`: DB에 없지만 채널에 올라간 영상 수
+
 ## 리포트 작성 지침
-- 마크다운 형식으로 작성
-- 한국어로 작성
+- 마크다운 형식, 한국어 작성
 - 아래 섹션을 포함하세요:
-  1. 전체 현황 요약 (총 영상 수, 평균 조회수, 최고/최저)
-  2. 조회수 편차 원인 분석 (카테고리, 요일/시간대, 콘텐츠 유형 관점)
-  3. 상위 5개 영상 특징 분석
-  4. 하위 5개 영상 특징 분석
-  5. 최근 7일 트렌드 (성장 또는 하락 여부)
-  6. 핵심 개선 제언 (우선순위 3가지)
-- 데이터에 근거한 구체적인 수치를 포함하세요
-- 섹션마다 핵심 인사이트를 1~2줄로 요약해주세요
+  1. **전체 현황 요약** — 총 영상 수, 평균/최고/최저 조회수, 표준편차로 편차 수준 평가
+  2. **조회수 편차 원인 분석** — 카테고리별, 콘텐츠 유형별, 요일/시간대 관점
+  3. **상위 5개 영상 특징** — 공통점 및 성공 요인
+  4. **하위 5개 영상 특징** — 공통점 및 개선 포인트
+  5. **최근 7일 트렌드** — 성장/하락 여부 및 원인 추정
+  6. **핵심 개선 제언** — 우선순위 3가지 (구체적 실행 방법 포함)
+- 모든 수치는 실제 데이터 기반으로 작성
+- 각 섹션 첫 줄에 핵심 인사이트 한 줄 요약
 """
 
     message = client.messages.create(
