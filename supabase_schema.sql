@@ -89,3 +89,14 @@ UPDATE topics SET prerequisites = ARRAY(
 UPDATE topics SET prerequisites = ARRAY(
   SELECT id FROM topics WHERE title = '주식이란 무엇인가'
 ) WHERE title = 'PER과 PBR 읽는 법';
+
+-- ============================================================
+-- 뉴스 관심도 컬럼 추가 (기존 DB에 실행)
+-- ============================================================
+ALTER TABLE news_items
+  ADD COLUMN IF NOT EXISTS interest_score  INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS interest_level  TEXT    DEFAULT 'medium'
+    CHECK (interest_level IN ('low', 'medium', 'high'));
+
+CREATE INDEX IF NOT EXISTS idx_news_interest ON news_items(interest_score DESC, published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_news_level    ON news_items(interest_level);

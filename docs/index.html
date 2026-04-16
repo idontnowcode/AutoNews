@@ -317,9 +317,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
       <button onclick="loadNews('done')"        id="nfDone"        style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">완료</button>
     </div>
     <!-- 분야 필터 -->
-    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap" id="nfCatRow">
+    <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap" id="nfCatRow">
       <button onclick="filterNewsCat('all')" id="ncAll" style="font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid #ffffff40;background:#ffffff18;color:#ccc;cursor:pointer">전체 분야</button>
       <!-- 나머지는 JS로 렌더링 -->
+    </div>
+    <!-- 관심도 필터 -->
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+      <span style="font-size:10px;color:#555;align-self:center">관심도</span>
+      <button onclick="filterNewsInterest('all')"    id="niAll"    style="font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;cursor:pointer">전체</button>
+      <button onclick="filterNewsInterest('high')"   id="niHigh"   style="font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">🔥 높음</button>
+      <button onclick="filterNewsInterest('medium')" id="niMedium" style="font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">⚡ 중간</button>
+      <button onclick="filterNewsInterest('low')"    id="niLow"    style="font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">· 낮음</button>
     </div>
 
     <div class="card" id="newsContainer">
@@ -679,8 +687,9 @@ function showTab(n) {
 }
 
 // ── 뉴스 ─────────────────────────────────────────
-var _newsFilter    = 'all';
-var _newsCatFilter = 'all';
+var _newsFilter       = 'all';
+var _newsCatFilter    = 'all';
+var _newsInterestFilter = 'all';
 
 function renderCatFilterBtns() {
   var row = document.getElementById('nfCatRow');
@@ -714,6 +723,20 @@ function filterNewsCat(cat) {
   loadNews(_newsFilter);
 }
 
+function filterNewsInterest(lvl) {
+  _newsInterestFilter = lvl;
+  // 관심도 필터 버튼 스타일
+  ['all','high','medium','low'].forEach(function(v) {
+    var btn = document.getElementById('ni' + v.charAt(0).toUpperCase() + v.slice(1));
+    if (!btn) return;
+    var active = v === _newsInterestFilter;
+    btn.style.background  = active ? '#FFD60A22' : 'transparent';
+    btn.style.color       = active ? '#FFD60A'   : '#888';
+    btn.style.borderColor = active ? '#FFD60A55' : '#ffffff20';
+  });
+  loadNews(_newsFilter);
+}
+
 async function loadNews(filter) {
   if (!sb) return;
   _newsFilter = filter || 'all';
@@ -728,10 +751,14 @@ async function loadNews(filter) {
     btn.style.borderColor= active ? '#FFD60A55' : '#ffffff20';
   });
 
-  var query = sb.from('news_items').select('id,title,source,status,youtube_id,published_at,created_at,category')
-                .order('published_at', {ascending: false}).limit(100);
-  if (_newsFilter !== 'all')    query = query.eq('status',   _newsFilter);
-  if (_newsCatFilter !== 'all') query = query.eq('category', _newsCatFilter);
+  var query = sb.from('news_items')
+                .select('id,title,source,status,youtube_id,published_at,created_at,category,interest_level,interest_score')
+                .order('interest_score', {ascending: false})
+                .order('published_at',   {ascending: false})
+                .limit(100);
+  if (_newsFilter !== 'all')         query = query.eq('status',         _newsFilter);
+  if (_newsCatFilter !== 'all')      query = query.eq('category',       _newsCatFilter);
+  if (_newsInterestFilter !== 'all') query = query.eq('interest_level', _newsInterestFilter);
 
   var res = await query;
   if (res.error) { toast('오류: ' + res.error.message); return; }
@@ -749,9 +776,13 @@ async function loadNews(filter) {
     var badgeCls = item.status === 'done' ? 'badge-done' : item.status === 'in_progress' ? 'badge-progress' : item.status === 'failed' ? 'badge-failed' : 'badge-pending';
     var badgeTxt = item.status === 'done' ? '완료' : item.status === 'in_progress' ? '생성중' : item.status === 'failed' ? '실패' : '대기';
     var dateStr  = item.published_at ? fmtDate(item.published_at) : fmtDate(item.created_at);
+    var intLvl   = item.interest_level || 'medium';
+    var intBadge = intLvl === 'high'   ? '<span title="관심도 높음 ('+( item.interest_score||'?')+'점)" style="font-size:11px;cursor:default">🔥</span>'
+                 : intLvl === 'medium' ? '<span title="관심도 중간 ('+( item.interest_score||'?')+'점)" style="font-size:11px;cursor:default">⚡</span>'
+                 :                       '<span title="관심도 낮음 ('+( item.interest_score||'?')+'점)" style="font-size:11px;cursor:default;opacity:.4">·</span>';
     html += '<div style="padding:10px 14px;border-bottom:1px solid #ffffff08;display:flex;align-items:flex-start;gap:10px">';
     html += '<div style="flex:1;min-width:0">';
-    html += '<div style="font-size:13px;font-weight:500;line-height:1.4;margin-bottom:4px">' + item.title + '</div>';
+    html += '<div style="font-size:13px;font-weight:500;line-height:1.4;margin-bottom:4px">' + intBadge + ' ' + item.title + '</div>';
     var catTag = item.category ? '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#ffffff15;color:#aaa;margin-right:5px">'+item.category+'</span>' : '';
     html += '<div style="font-size:11px;color:#555">' + catTag + (item.source||'') + ' · ' + dateStr + '</div>';
     if (item.youtube_id) {
@@ -774,14 +805,18 @@ async function loadNews(filter) {
 
 async function reserveNews(id) {
   if (!sb) return;
-  // published_at을 미래로 설정해 우선순위 올림
-  var res = await sb.from('news_items').update({ published_at: new Date().toISOString() }).eq('id', id);
+  // interest_score를 최고값(999)으로 설정 → get_next_news() 에서 무조건 1순위 선택
+  var res = await sb.from('news_items').update({
+    interest_score: 999,
+    interest_level: 'high',
+    published_at: new Date().toISOString()
+  }).eq('id', id);
   if (res.error) { toast('오류: ' + res.error.message); return; }
   if (cfg.token && cfg.repo) {
     await triggerNewsActions();
-    toast('⚡ 뉴스 즉시 생성 시작');
+    toast('⚡ 선택한 뉴스 즉시 생성 시작');
   } else {
-    toast('📅 뉴스 우선순위 설정됨');
+    toast('📅 선택한 뉴스 1순위로 설정됨');
   }
   loadNews(_newsFilter);
 }

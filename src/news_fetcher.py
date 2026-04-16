@@ -98,23 +98,30 @@ def fetch_rss_items(max_per_feed: int = DEFAULT_MAX_PER_FEED,
 
 
 def save_new_items(items: list[dict]) -> int:
-    """중복 제외하고 신규 뉴스만 DB에 저장"""
+    """중복 제외하고 신규 뉴스만 DB에 저장 (관심도 채점 포함)"""
+    from src.news_scorer import score_items, print_score_summary
+
+    # 관심도 채점 (저장 전 일괄 처리)
+    scored = score_items(items)
+    print_score_summary(scored)
+
     db = get_client()
     saved = 0
-    for item in items:
+    for item in scored:
         try:
-            # URL 기준 중복 체크
             existing = db.table('news_items').select('id').eq('url', item['url']).execute()
             if existing.data:
                 continue
             db.table('news_items').insert({
-                'title':        item['title'],
-                'url':          item['url'],
-                'source':       item['source'],
-                'summary':      item['summary'],
-                'status':       'pending',
-                'published_at': item.get('published_at'),
-                'category':     item.get('category', '경제'),
+                'title':           item['title'],
+                'url':             item['url'],
+                'source':          item['source'],
+                'summary':         item['summary'],
+                'status':          'pending',
+                'published_at':    item.get('published_at'),
+                'category':        item.get('category', '경제'),
+                'interest_score':  item.get('interest_score', 0),
+                'interest_level':  item.get('interest_level', 'medium'),
             }).execute()
             saved += 1
         except Exception as e:
@@ -123,11 +130,12 @@ def save_new_items(items: list[dict]) -> int:
 
 
 def get_next_news() -> dict | None:
-    """다음 처리할 뉴스 아이템 반환 (최신 pending 1건)"""
+    """관심도 높은 pending 뉴스 1건 반환 (interest_score DESC → published_at DESC)"""
     db = get_client()
     res = db.table('news_items') \
             .select('*') \
             .eq('status', 'pending') \
+            .order('interest_score', desc=True) \
             .order('published_at', desc=True) \
             .limit(1) \
             .execute()

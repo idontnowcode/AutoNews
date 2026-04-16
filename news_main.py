@@ -15,16 +15,21 @@ from src.image_generator      import generate_all_images
 from src.tts_generator        import generate_segments_tts
 from src.video_composer       import compose_video
 from src.youtube_uploader     import upload_shorts
+from src.settings_manager     import check_news_should_run
 
 load_dotenv()
 
 
 def main():
+    # ── 0. 자동 실행 체크 ─────────────────────────────
+    if not check_news_should_run():
+        sys.exit(0)
+
     ts       = datetime.now().strftime('%Y%m%d_%H%M%S')
     work_dir = f'output/news_{ts}'
     os.makedirs(work_dir, exist_ok=True)
 
-    # ── 1. RSS 수집 + DB 저장 ─────────────────────────
+    # ── 1. RSS 수집 + 관심도 채점 + DB 저장 ──────────
     print('📰 뉴스 RSS 수집 중...')
     settings = get_news_settings()
     max_per_feed = int(settings.get('news_max_per_feed', 5))
