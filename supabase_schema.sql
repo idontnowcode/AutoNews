@@ -109,7 +109,7 @@ CREATE INDEX IF NOT EXISTS idx_news_level    ON news_items(interest_level);
 CREATE TABLE IF NOT EXISTS video_stats (
   youtube_id    TEXT PRIMARY KEY,
   title         TEXT,
-  video_type    TEXT CHECK (video_type IN ('curriculum', 'news')),
+  video_type    TEXT CHECK (video_type IN ('curriculum', 'news', 'unknown')),
   category      TEXT,
   view_count    INTEGER DEFAULT 0,
   like_count    INTEGER DEFAULT 0,
@@ -126,6 +126,11 @@ CREATE TABLE IF NOT EXISTS analysis_reports (
   report_md   TEXT,
   stats_json  JSONB
 );
+
+-- 기존 DB에 이미 video_stats 테이블이 있는 경우 제약 조건 수정
+ALTER TABLE video_stats DROP CONSTRAINT IF EXISTS video_stats_video_type_check;
+ALTER TABLE video_stats ADD CONSTRAINT video_stats_video_type_check
+  CHECK (video_type IN ('curriculum', 'news', 'unknown'));
 
 CREATE INDEX IF NOT EXISTS idx_video_stats_type     ON video_stats(video_type);
 CREATE INDEX IF NOT EXISTS idx_video_stats_category ON video_stats(category);

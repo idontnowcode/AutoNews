@@ -219,10 +219,19 @@ def collect_all_stats() -> list[dict]:
     db_matched = sum(1 for yid in details if yid in db_meta)
     print(f'   DB 매칭: {db_matched}개 / 미매칭: {len(details) - db_matched}개 (채널 직접 업로드)')
 
-    # 4. 레코드 병합
+    # 4. 레코드 병합 (DB 미매칭 영상은 제목 패턴으로 자동 분류)
     records = []
     for yid, det in details.items():
-        meta = db_meta.get(yid, {'video_type': 'unknown', 'category': '기타'})
+        if yid in db_meta:
+            meta = db_meta[yid]
+        else:
+            title = det.get('title', '')
+            if '[일분 뉴스]' in title or '뉴스' in title:
+                meta = {'video_type': 'news', 'category': '뉴스'}
+            elif '[일분 경제]' in title or '경제' in title:
+                meta = {'video_type': 'curriculum', 'category': '커리큘럼'}
+            else:
+                meta = {'video_type': 'unknown', 'category': '기타'}
         records.append({
             'youtube_id': yid,
             **det,
