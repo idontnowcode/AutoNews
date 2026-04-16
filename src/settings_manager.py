@@ -82,9 +82,9 @@ def check_should_run() -> bool:
         print(f'⚠️  설정 조회 실패 ({e}) — 기본값으로 진행')
         return True
 
-    # ── 자동 업로드 ON/OFF ────────────────────────────
-    if settings.get('auto_enabled', 'true').lower() != 'true':
-        print('⏸️  자동 업로드 비활성화 — 건너뜁니다.')
+    # ── 커리큘럼 자동 업로드 ON/OFF (별도 키, 기본값 false) ──
+    if settings.get('curriculum_auto_enabled', 'false').lower() != 'true':
+        print('⏸️  커리큘럼 자동 업로드 비활성화 — 건너뜁니다.')
         return False
 
     # ── 간격 체크 ─────────────────────────────────────
