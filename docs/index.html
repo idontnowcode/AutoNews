@@ -751,16 +751,28 @@ async function loadNews(filter) {
     btn.style.borderColor= active ? '#FFD60A55' : '#ffffff20';
   });
 
+  // interest 컬럼 포함 쿼리 시도 → 컬럼 없으면 기본 쿼리로 fallback
+  var useInterest = true;
   var query = sb.from('news_items')
                 .select('id,title,source,status,youtube_id,published_at,created_at,category,interest_level,interest_score')
                 .order('interest_score', {ascending: false})
                 .order('published_at',   {ascending: false})
                 .limit(100);
-  if (_newsFilter !== 'all')         query = query.eq('status',         _newsFilter);
-  if (_newsCatFilter !== 'all')      query = query.eq('category',       _newsCatFilter);
+  if (_newsFilter !== 'all')         query = query.eq('status',   _newsFilter);
+  if (_newsCatFilter !== 'all')      query = query.eq('category', _newsCatFilter);
   if (_newsInterestFilter !== 'all') query = query.eq('interest_level', _newsInterestFilter);
 
   var res = await query;
+  if (res.error && res.error.message && res.error.message.includes('interest')) {
+    // 컬럼 미생성 시 기본 쿼리로 재시도
+    useInterest = false;
+    var q2 = sb.from('news_items')
+               .select('id,title,source,status,youtube_id,published_at,created_at,category')
+               .order('published_at', {ascending: false}).limit(100);
+    if (_newsFilter !== 'all')    q2 = q2.eq('status',   _newsFilter);
+    if (_newsCatFilter !== 'all') q2 = q2.eq('category', _newsCatFilter);
+    res = await q2;
+  }
   if (res.error) { toast('오류: ' + res.error.message); return; }
   var items = res.data || [];
   var el = document.getElementById('newsContainer');
