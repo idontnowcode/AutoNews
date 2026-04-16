@@ -150,6 +150,44 @@ def get_next_news() -> dict | None:
     return res.data[0] if res.data else None
 
 
+def get_next_high_interest_news() -> dict | None:
+    """
+    예약 발행 모드용: high → medium → 전체 순으로 pending 뉴스 1건 반환.
+    관심도가 높은 뉴스를 최우선 선택.
+    """
+    db = get_client()
+    for level in ('high', 'medium', None):
+        q = (db.table('news_items')
+               .select('*')
+               .eq('status', 'pending')
+               .order('interest_score', desc=True)
+               .order('published_at', desc=True)
+               .limit(1))
+        if level:
+            q = q.eq('interest_level', level)
+        res = q.execute()
+        if res.data:
+            chosen_level = res.data[0].get('interest_level', '?')
+            print(f'   🎯 관심도 {chosen_level} 뉴스 선택: {res.data[0]["title"][:40]}')
+            return res.data[0]
+    return None
+
+
+def refresh_and_fetch_news(max_per_feed: int = 5) -> int:
+    """
+    예약 발행 직전 호출:
+    기존 pending 뉴스를 모두 삭제하고 RSS에서 최신 뉴스를 새로 수집·저장.
+    저장된 건수 반환.
+    """
+    db = get_client()
+    db.table('news_items').delete().eq('status', 'pending').execute()
+    print('   🗑️  기존 pending 뉴스 삭제 완료')
+    items = fetch_rss_items(max_per_feed=max_per_feed)
+    saved = save_new_items(items)
+    print(f'   📰 최신 뉴스 {len(items)}건 수집 / {saved}건 저장')
+    return saved
+
+
 def mark_news_in_progress(news_id: str):
     get_client().table('news_items').update({'status': 'in_progress'}).eq('id', news_id).execute()
 

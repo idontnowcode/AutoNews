@@ -8,6 +8,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from src.news_fetcher        import (fetch_rss_items, save_new_items, get_next_news,
+                                      get_next_high_interest_news, refresh_and_fetch_news,
                                       mark_news_in_progress, mark_news_done, mark_news_pending,
                                       mark_news_failed, delete_old_news, get_news_settings)
 from src.news_script_generator import generate_news_script
@@ -30,26 +31,36 @@ def main():
     work_dir     = f'output/news_{ts}'
     os.makedirs(work_dir, exist_ok=True)
 
-    # ── 1. RSS 수집 + 관심도 채점 + DB 저장 ──────────
-    print('📰 뉴스 RSS 수집 중...')
     news_settings = get_news_settings()
-    max_per_feed = int(news_settings.get('news_max_per_feed', 5))
-    items = fetch_rss_items(max_per_feed=max_per_feed)
-    saved = save_new_items(items)
-    print(f'   총 {len(items)}건 수집 / {saved}건 신규 저장')
+    max_per_feed  = int(news_settings.get('news_max_per_feed', 5))
+    schedule_on   = settings.get('upload_schedule_enabled', 'false').lower() == 'true'
 
-    # ── 1-1. 오래된 뉴스 자동 삭제 ───────────────────
-    delete_days = int(news_settings.get('news_delete_days', 0))
-    if delete_days > 0:
-        deleted = delete_old_news(delete_days)
-        if deleted:
-            print(f'   🗑️  {delete_days}일 이상 된 뉴스 {deleted}건 삭제')
+    # ── 1. RSS 수집 + 관심도 채점 + DB 저장 ──────────
+    if schedule_on:
+        # 예약 발행 모드: pending 뉴스 전체 삭제 후 최신 뉴스 재수집
+        print('🔄 예약 발행 모드: 최신 뉴스 실시간 수집 중...')
+        refresh_and_fetch_news(max_per_feed=max_per_feed)
+    else:
+        print('📰 뉴스 RSS 수집 중...')
+        items = fetch_rss_items(max_per_feed=max_per_feed)
+        saved = save_new_items(items)
+        print(f'   총 {len(items)}건 수집 / {saved}건 신규 저장')
+
+        # ── 1-1. 오래된 뉴스 자동 삭제 (일반 모드만) ─────
+        delete_days = int(news_settings.get('news_delete_days', 0))
+        if delete_days > 0:
+            deleted = delete_old_news(delete_days)
+            if deleted:
+                print(f'   🗑️  {delete_days}일 이상 된 뉴스 {deleted}건 삭제')
 
     news = None
 
     try:
         # ── 2. 다음 처리할 뉴스 선택 ──────────────────────
-        news = get_next_news()
+        if schedule_on:
+            news = get_next_high_interest_news()  # high → medium → any 우선순위
+        else:
+            news = get_next_news()
         if not news:
             print('📭 처리할 뉴스가 없습니다. 내일 다시 시도합니다.')
             sys.exit(0)
@@ -89,7 +100,8 @@ def main():
             if settings.get('upload_schedule_enabled', 'false').lower() == 'true':
                 publish_at = get_next_optimal_time(
                     days_str  = settings.get('upload_schedule_days', 'mon,tue'),
-                    hour_kst  = int(settings.get('upload_schedule_hour', '20')),
+                    hours_str = settings.get('upload_schedule_hours',
+                                             settings.get('upload_schedule_hour', '20')),
                 )
                 print(f'   📅 예약 발행 설정: {publish_at} (UTC)')
             video_id = upload_shorts(video_path, script, youtube_title_prefix='[일분 뉴스] ',

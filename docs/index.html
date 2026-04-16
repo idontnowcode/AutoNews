@@ -513,26 +513,37 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
         <div style="font-size:14px;font-weight:600">업로드 예약 발행</div>
         <div style="font-size:11px;color:#555;margin-top:2px">최적 요일·시간에 자동 예약</div>
       </div>
-      <label style="position:relative;width:44px;height:24px;cursor:pointer">
-        <input type="checkbox" id="cfgScheduleEnabled" style="opacity:0;width:0;height:0">
-        <span id="cfgScheduleToggle" onclick="toggleScheduleSwitch()" style="position:absolute;inset:0;background:#ffffff20;border-radius:12px;transition:.2s;cursor:pointer">
+      <div style="position:relative;width:44px;height:24px;cursor:pointer" onclick="toggleScheduleSwitch()">
+        <input type="checkbox" id="cfgScheduleEnabled" style="display:none">
+        <span id="cfgScheduleToggle" style="position:absolute;inset:0;background:#ffffff20;border-radius:12px;transition:.2s">
           <span id="cfgScheduleKnob" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.2s"></span>
         </span>
-      </label>
+      </div>
     </div>
 
     <div id="cfgScheduleRow" style="display:none">
       <div class="form-group" style="margin-bottom:10px">
-        <label class="form-label">발행 요일 <span style="color:#555">(쉼표 구분)</span></label>
+        <label class="form-label">발행 요일</label>
+        <div style="display:flex;gap:5px;margin-bottom:6px;flex-wrap:wrap">
+          <button type="button" onclick="setScheduleDays('everyday')"
+            style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;cursor:pointer">매일</button>
+          <button type="button" onclick="setScheduleDays('mon,tue,wed,thu,fri')"
+            style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">평일</button>
+          <button type="button" onclick="setScheduleDays('mon,tue')"
+            style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">월·화</button>
+          <button type="button" onclick="setScheduleDays('sat,sun')"
+            style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">주말</button>
+        </div>
         <input id="cfgScheduleDays" class="form-input" type="text" value="mon,tue"
-          placeholder="mon,tue,wed,thu,fri,sat,sun">
-        <div style="font-size:11px;color:#555;margin-top:4px">mon=월 tue=화 wed=수 thu=목 fri=금 sat=토 sun=일</div>
+          placeholder="everyday 또는 mon,tue,...">
+        <div style="font-size:11px;color:#555;margin-top:4px">everyday=매일 / mon=월 tue=화 wed=수 thu=목 fri=금 sat=토 sun=일</div>
       </div>
       <div class="form-group">
-        <label class="form-label">발행 시간 (KST)</label>
+        <label class="form-label">발행 시간 (KST, 쉼표로 여러 시간)</label>
         <div style="display:flex;align-items:center;gap:8px">
-          <input id="cfgScheduleHour" class="form-input" type="number" min="0" max="23" value="20" style="width:80px;text-align:center">
-          <span style="font-size:12px;color:#555">시 (예: 20 = 오후 8시)</span>
+          <input id="cfgScheduleHours" class="form-input" type="text" value="20"
+            placeholder="9,20" style="width:100px;text-align:center">
+          <span style="font-size:12px;color:#555">시 (예: 9,20 = 오전 9시·오후 8시)</span>
         </div>
       </div>
     </div>
@@ -638,6 +649,9 @@ function updateScheduleToggleUI(on) {
   knob.style.left         = on ? '22px'    : '2px';
   row.style.display       = on ? 'block'   : 'none';
 }
+function setScheduleDays(val) {
+  document.getElementById('cfgScheduleDays').value = val;
+}
 
 async function loadAutoSettings() {
   if (!sb) return;
@@ -656,8 +670,9 @@ async function loadAutoSettings() {
   var schedEnabled = s['upload_schedule_enabled'] === 'true';
   document.getElementById('cfgScheduleEnabled').checked = schedEnabled;
   updateScheduleToggleUI(schedEnabled);
-  if (s['upload_schedule_days']) document.getElementById('cfgScheduleDays').value = s['upload_schedule_days'];
-  if (s['upload_schedule_hour']) document.getElementById('cfgScheduleHour').value = s['upload_schedule_hour'];
+  if (s['upload_schedule_days'])  document.getElementById('cfgScheduleDays').value  = s['upload_schedule_days'];
+  if (s['upload_schedule_hours']) document.getElementById('cfgScheduleHours').value = s['upload_schedule_hours'];
+  else if (s['upload_schedule_hour']) document.getElementById('cfgScheduleHours').value = s['upload_schedule_hour']; // 하위 호환
 }
 
 async function saveAutoSettings() {
@@ -666,8 +681,8 @@ async function saveAutoSettings() {
   var intVal        = document.getElementById('cfgIntervalVal').value  || '1';
   var intUnit       = document.getElementById('cfgIntervalUnit').value || 'days';
   var schedEnabled  = document.getElementById('cfgScheduleEnabled').checked;
-  var schedDays     = document.getElementById('cfgScheduleDays').value.trim() || 'mon,tue';
-  var schedHour     = document.getElementById('cfgScheduleHour').value || '20';
+  var schedDays     = document.getElementById('cfgScheduleDays').value.trim()  || 'mon,tue';
+  var schedHours    = document.getElementById('cfgScheduleHours').value.trim() || '20';
 
   var rows = [
     { key: 'auto_enabled',             value: String(enabled) },
@@ -675,7 +690,7 @@ async function saveAutoSettings() {
     { key: 'interval_unit',            value: intUnit },
     { key: 'upload_schedule_enabled',  value: String(schedEnabled) },
     { key: 'upload_schedule_days',     value: schedDays },
-    { key: 'upload_schedule_hour',     value: schedHour }
+    { key: 'upload_schedule_hours',    value: schedHours }
   ];
   for (var i = 0; i < rows.length; i++) {
     await sb.from('settings').upsert(rows[i], { onConflict: 'key' });

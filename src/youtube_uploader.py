@@ -30,29 +30,52 @@ def _get_youtube_client():
 
 _DAY_MAP = {'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3, 'fri': 4, 'sat': 5, 'sun': 6}
 
-def get_next_optimal_time(days_str: str = 'mon,tue', hour_kst: int = 20) -> str:
+def get_next_optimal_time(days_str: str = 'mon,tue', hours_str: str = '20') -> str:
     """
-    설정된 요일 중 가장 가까운 다음 업로드 시각 반환 (UTC ISO 8601).
-    days_str: 'mon,tue' 형식 (쉼표 구분)
-    hour_kst: KST 시간 (기본 20시) → UTC = KST - 9
+    설정된 요일/시간 조합 중 가장 가까운 다음 업로드 시각 반환 (UTC ISO 8601).
+    days_str : 'mon,tue' 또는 'everyday' (매일)
+    hours_str: '20' 또는 '9,20' (KST, 쉼표로 여러 시간 지정 가능)
     """
-    target_days = [_DAY_MAP[d.strip().lower()] for d in days_str.split(',') if d.strip().lower() in _DAY_MAP]
+    # 요일 파싱
+    if days_str.strip().lower() == 'everyday':
+        target_days = list(range(7))
+    else:
+        target_days = [_DAY_MAP[d.strip().lower()] for d in days_str.split(',')
+                       if d.strip().lower() in _DAY_MAP]
     if not target_days:
         target_days = [0, 1]  # 기본 월·화
 
-    hour_utc = (hour_kst - 9) % 24
+    # 시간 파싱 (KST → UTC)
+    hours_utc = []
+    for h in hours_str.split(','):
+        try:
+            hours_utc.append((int(h.strip()) - 9) % 24)
+        except ValueError:
+            pass
+    if not hours_utc:
+        hours_utc = [(20 - 9) % 24]  # 기본 20시 KST
+
     now_utc = datetime.now(timezone.utc)
+    best: datetime | None = None
 
-    # 오늘부터 7일 내 가장 가까운 목표 요일 탐색
-    for offset in range(1, 8):
-        candidate = now_utc + timedelta(days=offset)
-        if candidate.weekday() in target_days:
-            publish_dt = candidate.replace(hour=hour_utc, minute=0, second=0, microsecond=0)
-            return publish_dt.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
+    # 오늘 포함 7일, 모든 (요일 × 시간) 조합에서 가장 가까운 미래 시각 탐색
+    for offset in range(8):
+        candidate_date = now_utc + timedelta(days=offset)
+        if candidate_date.weekday() not in target_days:
+            continue
+        for hour_utc in hours_utc:
+            publish_dt = candidate_date.replace(hour=hour_utc, minute=0, second=0, microsecond=0)
+            if publish_dt <= now_utc:
+                continue  # 이미 지난 시각 스킵
+            if best is None or publish_dt < best:
+                best = publish_dt
 
-    # fallback: 내일 같은 시각
-    tomorrow = (now_utc + timedelta(days=1)).replace(hour=hour_utc, minute=0, second=0, microsecond=0)
-    return tomorrow.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
+    if best is None:
+        # fallback: 내일 첫 번째 시간
+        best = (now_utc + timedelta(days=1)).replace(
+            hour=hours_utc[0], minute=0, second=0, microsecond=0)
+
+    return best.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
 
 
 def upload_shorts(video_path: str, script_data: dict,
