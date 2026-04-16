@@ -2,16 +2,17 @@
 영상 합성:
 - Pillow로 각 세그먼트 프레임 합성 (검정 배경 + 노란 제목 + 이미지 + 흰 자막)
 - MoviePy로 프레임 + 오디오 → MP4
-- 나레이션 끝나면 다음 이미지로 전환
+- 나레이션 자막: 타이핑 효과 (문자가 하나씩 나타남)
 """
 import os
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 try:
-    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
+    from moviepy.editor import ImageSequenceClip, AudioFileClip, concatenate_videoclips
     MOVIEPY_V2 = False
 except ModuleNotFoundError:
-    from moviepy import ImageClip, AudioFileClip, concatenate_videoclips
+    from moviepy import ImageSequenceClip, AudioFileClip, concatenate_videoclips
     MOVIEPY_V2 = True
 
 W, H   = 1080, 1920
@@ -20,11 +21,11 @@ C_BLACK  = (0,   0,   0)
 C_YELLOW = (255, 214,  10)
 C_WHITE  = (255, 255, 255)
 
-# 레이아웃 (상단 제목 → 이미지 → 하단 자막)
-TITLE_TOP    = 120    # 제목 시작 Y (상단 여백 확보)
-IMG_Y        = 360    # 이미지 시작 Y
-IMG_SIZE     = 1080   # 이미지 크기 (정사각형, 1:1)
-SUB_Y        = H - 340  # 자막 Y (하단에서 고정, 한 줄)
+TITLE_TOP    = 120
+IMG_Y        = 360
+IMG_SIZE     = 1080
+
+TYPING_SPEED = 22   # 초당 타이핑 글자 수 (자연스러운 속도)
 
 
 def _get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
@@ -33,7 +34,6 @@ def _get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
             else '/usr/share/fonts/truetype/nanum/NanumGothic.ttf',
         '/usr/share/fonts/truetype/nanum/NanumGothic.ttf',
         '/usr/share/fonts/truetype/nanum/NanumGothicExtraBold.ttf',
-        # Ubuntu 기본 폰트 (한글 미지원이지만 폴백용)
         '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf' if bold
             else '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
         '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf' if bold
@@ -45,12 +45,9 @@ def _get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
     for path in candidates:
         if os.path.exists(path):
             try:
-                font = ImageFont.truetype(path, size)
-                print(f'[font] {path} (size={size})')
-                return font
+                return ImageFont.truetype(path, size)
             except Exception:
                 continue
-    print(f'[font] WARNING: no truetype font found for size={size}, using default (text will be tiny!)')
     return ImageFont.load_default()
 
 
@@ -72,7 +69,6 @@ def _wrap_text(draw, text: str, font, max_width: int) -> list:
 
 def _draw_centered_text(draw, text: str, y: int, font, fill,
                         max_width: int, line_gap: int = 12) -> int:
-    """중앙 정렬 여러 줄 텍스트, 다음 y 반환"""
     for line in _wrap_text(draw, text, font, max_width):
         lw = draw.textlength(line, font=font)
         draw.text(((W - lw) // 2, y), line, font=font, fill=fill)
@@ -83,7 +79,6 @@ def _draw_centered_text(draw, text: str, y: int, font, fill,
 
 def _measure_text_height(draw, text: str, font, max_width: int,
                          line_gap: int = 16) -> int:
-    """텍스트 전체 높이(px) 계산"""
     total = 0
     for line in _wrap_text(draw, text, font, max_width):
         bbox = draw.textbbox((0, 0), line, font=font)
@@ -93,7 +88,6 @@ def _measure_text_height(draw, text: str, font, max_width: int,
 
 def _fit_title_font(draw, title: str, max_width: int,
                     max_height: int = 230) -> ImageFont.FreeTypeFont:
-    """제목이 max_height 안에 들어오도록 폰트 크기 자동 조정"""
     for size in (96, 76, 60, 48):
         font = _get_font(size, bold=True)
         if _measure_text_height(draw, title, font, max_width) <= max_height:
@@ -101,25 +95,26 @@ def _fit_title_font(draw, title: str, max_width: int,
     return _get_font(48, bold=True)
 
 
-def make_frame(title: str, image_path: str, narration: str,
-               frame_path: str) -> str:
-    """한 세그먼트 합성 프레임 PNG 생성"""
+# ── 베이스 프레임 (자막 제외) ─────────────────────────────────────
+
+def _make_base(title: str, image_path: str) -> tuple:
+    """
+    자막 없이 제목 + 이미지만 렌더링.
+    반환: (PIL Image, sub_font, line_h, sub_y, sub_bottom, pad)
+    """
+    pad   = 50
     frame = Image.new('RGB', (W, H), C_BLACK)
     draw  = ImageDraw.Draw(frame)
-    pad   = 50
 
-    # ── 상단: 노란 강조 제목 (폰트 자동 축소) ──────────
+    # 제목
     title_font = _fit_title_font(draw, title, W - pad * 2, max_height=230)
     title_h    = _measure_text_height(draw, title, title_font, W - pad * 2)
-    _draw_centered_text(draw, title, TITLE_TOP, title_font,
-                        C_YELLOW, W - pad * 2, line_gap=16)
+    _draw_centered_text(draw, title, TITLE_TOP, title_font, C_YELLOW, W - pad * 2, line_gap=16)
 
-    # 제목 아래 40px 여백 확보, 최소 IMG_Y 보장
     img_y = max(IMG_Y, TITLE_TOP + title_h + 40)
-    # 하단 자막 공간 360px 확보
     img_y = min(img_y, H - IMG_SIZE - 360)
 
-    # ── 중간: DALL-E 이미지 (검정 배경 위에 정사각형) ──
+    # 이미지
     if image_path and os.path.exists(image_path):
         img = Image.open(image_path).convert('RGB')
         iw, ih = img.size
@@ -131,51 +126,106 @@ def make_frame(title: str, image_path: str, narration: str,
     else:
         draw.rectangle([(0, img_y), (W, img_y + IMG_SIZE)], fill=C_BLACK)
 
-    # ── 하단: 흰 나레이션 자막 (최대 3줄, 이미지 아래 고정) ──
+    # 자막 레이아웃 파라미터 계산 (실제 그리기는 안 함)
     sub_font   = _get_font(62, bold=True)
-    lines      = _wrap_text(draw, narration, sub_font, W - pad * 2)[:3]
     line_h     = sub_font.getbbox('가')[3] + 14
-    total_h    = line_h * len(lines)
-    sub_top    = img_y + IMG_SIZE + 20           # 이미지 아래 20px
-    sub_bottom = H - 80 - line_h                 # 화면 하단 80px + 자막 한 줄 높이 여백
-    y = max(sub_top, sub_bottom - total_h)       # 공간 있으면 이미지 바로 아래, 없으면 하단 고정
-    for line in lines:
-        lw = draw.textlength(line, font=sub_font)
-        draw.text(((W - lw) // 2, y), line, font=sub_font, fill=C_WHITE)
-        y += line_h
+    sub_top    = img_y + IMG_SIZE + 20
+    sub_bottom = H - 80 - line_h
 
-    frame.save(frame_path)
+    return frame, sub_font, line_h, sub_top, sub_bottom, pad
+
+
+def _draw_subtitle(base_img: Image.Image, text: str,
+                   sub_font, line_h: int, sub_top: int,
+                   sub_bottom: int, pad: int) -> np.ndarray:
+    """베이스 이미지에 자막 text를 그린 numpy 배열 반환"""
+    img  = base_img.copy()
+    draw = ImageDraw.Draw(img)
+
+    if text:
+        lines   = _wrap_text(draw, text, sub_font, W - pad * 2)[:3]
+        total_h = line_h * len(lines)
+        y       = max(sub_top, sub_bottom - total_h)
+        for line in lines:
+            lw = draw.textlength(line, font=sub_font)
+            draw.text(((W - lw) // 2, y), line, font=sub_font, fill=C_WHITE)
+            y += line_h
+
+    return np.array(img)
+
+
+# ── 타이핑 효과 클립 생성 ─────────────────────────────────────────
+
+def _make_typing_clip(title: str, image_path: str,
+                      narration: str, audio_path: str):
+    """
+    자막이 한 글자씩 타이핑되는 VideoClip 반환.
+    - TYPING_SPEED 글자/초로 타이핑 → 이후 전체 자막 유지
+    - 베이스 프레임은 1회만 렌더링, 자막 상태별 numpy 배열 캐싱
+    """
+    base_img, sub_font, line_h, sub_top, sub_bottom, pad = _make_base(title, image_path)
+    audio        = AudioFileClip(audio_path)
+    duration     = audio.duration
+    total_chars  = len(narration)
+    total_frames = max(1, int(duration * FPS))
+
+    # 자막 상태(글자 수) → numpy 배열 캐시
+    _cache: dict[int, np.ndarray] = {}
+
+    def get_arr(n: int) -> np.ndarray:
+        if n not in _cache:
+            _cache[n] = _draw_subtitle(base_img, narration[:n],
+                                       sub_font, line_h, sub_top, sub_bottom, pad)
+        return _cache[n]
+
+    # 타이핑 완료 시점: 전체 길이의 최대 50% 또는 타이핑 소요 시간
+    typing_end = min(total_chars / TYPING_SPEED, duration * 0.5)
+
+    frames = []
+    for i in range(total_frames):
+        t = i / FPS
+        if t >= typing_end:
+            n = total_chars
+        else:
+            n = min(int(t * TYPING_SPEED) + 1, total_chars)
+        frames.append(get_arr(n))
+
+    clip = ImageSequenceClip(frames, fps=FPS)
+
+    if MOVIEPY_V2:
+        clip = clip.with_audio(audio)
+    else:
+        clip = clip.set_audio(audio)
+
+    print(f'   [타이핑] "{narration[:20]}..." '
+          f'→ {total_chars}자 / {typing_end:.1f}s 내 완성 / 총 {duration:.1f}s')
+    return clip
+
+
+# ── 공개 API ──────────────────────────────────────────────────────
+
+def make_frame(title: str, image_path: str, narration: str,
+               frame_path: str) -> str:
+    """단일 정적 프레임 PNG 저장 (하위 호환용)"""
+    base_img, sub_font, line_h, sub_top, sub_bottom, pad = _make_base(title, image_path)
+    arr = _draw_subtitle(base_img, narration, sub_font, line_h, sub_top, sub_bottom, pad)
+    Image.fromarray(arr).save(frame_path)
     return frame_path
 
 
 def compose_video(segments_data: list, title: str, output_path: str) -> str:
     """
     segments_data: [{'audio_path': ..., 'narration': ..., 'image_path': ..., 'index': ...}]
-    각 세그먼트 = 이미지 + 오디오 + 자막 프레임
+    타이핑 효과 자막으로 영상 합성
     """
-    frames_dir = output_path.replace('.mp4', '_frames')
-    os.makedirs(frames_dir, exist_ok=True)
-
     clips = []
     for seg in segments_data:
-        idx       = seg['index']
-        frame_path = os.path.join(frames_dir, f'frame_{idx:02d}.png')
-
-        make_frame(
-            title       = title,
-            image_path  = seg.get('image_path', ''),
-            narration   = seg['narration'],
-            frame_path  = frame_path
+        clip = _make_typing_clip(
+            title      = title,
+            image_path = seg.get('image_path', ''),
+            narration  = seg['narration'],
+            audio_path = seg['audio_path'],
         )
-
-        audio = AudioFileClip(seg['audio_path'])
-
-        if MOVIEPY_V2:
-            clip = ImageClip(frame_path, duration=audio.duration).with_audio(audio)
-        else:
-            clip = (ImageClip(frame_path)
-                    .set_duration(audio.duration)
-                    .set_audio(audio))
         clips.append(clip)
 
     final = concatenate_videoclips(clips, method='compose')
