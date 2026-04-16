@@ -137,7 +137,7 @@ def make_frame(title: str, image_path: str, narration: str,
     line_h     = sub_font.getbbox('가')[3] + 14
     total_h    = line_h * len(lines)
     sub_top    = img_y + IMG_SIZE + 20           # 이미지 아래 20px
-    sub_bottom = H - 80                          # 화면 하단 80px 여백
+    sub_bottom = H - 80 - line_h                 # 화면 하단 80px + 자막 한 줄 높이 여백
     y = max(sub_top, sub_bottom - total_h)       # 공간 있으면 이미지 바로 아래, 없으면 하단 고정
     for line in lines:
         lw = draw.textlength(line, font=sub_font)
