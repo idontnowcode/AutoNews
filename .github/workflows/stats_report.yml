@@ -1,0 +1,24 @@
+name: 영상 통계 분석 리포트 (6시간마다)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'   # 6시간마다 자동 실행 (UTC 기준)
+
+jobs:
+  stats-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Python 패키지 설치
+        run: pip install --no-cache-dir -r requirements.txt
+      - name: 통계 수집 및 분석 리포트 생성
+        env:
+          YOUTUBE_TOKEN:      ${{ secrets.YOUTUBE_TOKEN }}
+          ANTHROPIC_API_KEY:  ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL:       ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY:       ${{ secrets.SUPABASE_KEY }}
+        run: python stats_report.py

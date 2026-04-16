@@ -100,3 +100,33 @@ ALTER TABLE news_items
 
 CREATE INDEX IF NOT EXISTS idx_news_interest ON news_items(interest_score DESC, published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_news_level    ON news_items(interest_level);
+
+-- ============================================================
+-- 영상 통계 분석 (stats-report)
+-- ============================================================
+
+-- 영상별 최신 통계 스냅샷 (youtube_id 기준 upsert)
+CREATE TABLE IF NOT EXISTS video_stats (
+  youtube_id    TEXT PRIMARY KEY,
+  title         TEXT,
+  video_type    TEXT CHECK (video_type IN ('curriculum', 'news')),
+  category      TEXT,
+  view_count    INTEGER DEFAULT 0,
+  like_count    INTEGER DEFAULT 0,
+  comment_count INTEGER DEFAULT 0,
+  duration_sec  INTEGER DEFAULT 0,
+  published_at  TIMESTAMPTZ,
+  fetched_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 분석 리포트 히스토리
+CREATE TABLE IF NOT EXISTS analysis_reports (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  report_md   TEXT,
+  stats_json  JSONB
+);
+
+CREATE INDEX IF NOT EXISTS idx_video_stats_type     ON video_stats(video_type);
+CREATE INDEX IF NOT EXISTS idx_video_stats_category ON video_stats(category);
+CREATE INDEX IF NOT EXISTS idx_reports_created      ON analysis_reports(created_at DESC);

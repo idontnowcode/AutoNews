@@ -168,6 +168,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
   <button class="tab-btn" id="tabBtn2" onclick="showTab(2)">📋 히스토리</button>
   <button class="tab-btn" id="tabBtn3" onclick="showTab(3)">📰 뉴스</button>
   <button class="tab-btn" id="tabBtn4" onclick="showTab(4)">💰 비용</button>
+  <button class="tab-btn" id="tabBtn5" onclick="showTab(5)">📊 리포트</button>
 </div>
 
 <!-- 탭 0: 커리큘럼 -->
@@ -418,6 +419,33 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- 탭 5: 리포트 -->
+<div id="tabPane5" style="display:none">
+  <div style="padding:16px;max-width:720px;margin:0 auto">
+    <!-- 헤더 -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;color:#FFD60A">📊 영상 통계 분석 리포트</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="reportSelect"
+          style="background:#ffffff12;border:1px solid #ffffff25;border-radius:6px;color:#ccc;font-size:11px;padding:4px 8px"
+          onchange="loadReport(this.value)">
+        </select>
+        <button onclick="loadReportList()"
+          style="font-size:11px;padding:4px 10px;background:#FFD60A22;border:1px solid #FFD60A55;border-radius:5px;color:#FFD60A;cursor:pointer">
+          🔄 새로고침
+        </button>
+      </div>
+    </div>
+    <!-- 리포트 본문 -->
+    <div id="reportBody"
+      style="background:#0d0d1a;border:1px solid #ffffff15;border-radius:10px;padding:20px;
+             font-size:13px;color:#ccc;line-height:1.7;min-height:200px;white-space:pre-wrap;word-break:break-word">
+      <div style="color:#444;text-align:center;padding:40px">Supabase 연결 후 표시됩니다</div>
+    </div>
+    <div id="reportMeta" style="font-size:11px;color:#555;margin-top:8px;text-align:right"></div>
   </div>
 </div>
 
@@ -686,12 +714,13 @@ async function toggleHeaderAuto() {
 
 // ── 탭 ───────────────────────────────────────────
 function showTab(n) {
-  for (var i = 0; i < 5; i++) {
+  for (var i = 0; i < 6; i++) {
     document.getElementById('tabPane' + i).style.display = i === n ? 'block' : 'none';
     document.getElementById('tabBtn' + i).className = 'tab-btn' + (i === n ? ' active' : '');
   }
   if (n === 3) loadNews('all');
   if (n === 4) loadCostStats();
+  if (n === 5) loadReportList();
   try { localStorage.setItem('ibbun_tab', n); } catch(e) {}
 }
 
@@ -984,6 +1013,55 @@ async function loadNewsSettings() {
 
 
 // ── 비용 (실제 DB 기반) ───────────────────────────
+// ── 리포트 ────────────────────────────────────────
+async function loadReportList() {
+  if (!sb) {
+    document.getElementById('reportBody').innerHTML = '<div style="color:#fb923c;text-align:center;padding:40px">⚙️ 설정에서 Supabase를 먼저 연결하세요</div>';
+    return;
+  }
+  var res = await sb.from('analysis_reports')
+    .select('id,created_at')
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (res.error || !res.data || res.data.length === 0) {
+    document.getElementById('reportBody').innerHTML = '<div style="color:#444;text-align:center;padding:40px">아직 생성된 리포트가 없습니다.<br><small style="color:#333">GitHub Actions가 6시간마다 자동 생성합니다.</small></div>';
+    return;
+  }
+  var sel = document.getElementById('reportSelect');
+  sel.innerHTML = res.data.map(function(r) {
+    var d = new Date(r.created_at);
+    var label = d.getFullYear() + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0')
+      + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    return '<option value="' + r.id + '">' + label + '</option>';
+  }).join('');
+  loadReport(res.data[0].id);
+}
+
+async function loadReport(id) {
+  if (!sb || !id) return;
+  document.getElementById('reportBody').innerHTML = '<div style="color:#444;text-align:center;padding:40px">로딩 중...</div>';
+  var res = await sb.from('analysis_reports').select('report_md,created_at').eq('id', id).single();
+  if (res.error || !res.data) {
+    document.getElementById('reportBody').innerHTML = '<div style="color:#ef4444;text-align:center;padding:40px">리포트 로딩 실패</div>';
+    return;
+  }
+  // 마크다운 → HTML 간단 변환
+  var md = res.data.report_md || '';
+  var html = md
+    .replace(/^### (.+)$/gm, '<h4 style="color:#FFD60A;margin:16px 0 6px">$1</h4>')
+    .replace(/^## (.+)$/gm,  '<h3 style="color:#fff;margin:20px 0 8px;border-bottom:1px solid #ffffff15;padding-bottom:6px">$1</h3>')
+    .replace(/^# (.+)$/gm,   '<h2 style="color:#FFD60A;margin:0 0 16px;font-size:16px">$1</h2>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#fff">$1</strong>')
+    .replace(/^- (.+)$/gm,   '<li style="margin:3px 0;color:#ccc">$1</li>')
+    .replace(/^(\d+)\. (.+)$/gm, '<li style="margin:3px 0;color:#ccc"><span style="color:#FFD60A">$1.</span> $2</li>')
+    .replace(/\n\n/g, '<br>')
+    .replace(/`(.+?)`/g, '<code style="background:#ffffff15;padding:1px 5px;border-radius:3px;font-size:12px;color:#a5f3fc">$1</code>');
+  document.getElementById('reportBody').innerHTML = '<div style="line-height:1.8">' + html + '</div>';
+  var d = new Date(res.data.created_at);
+  document.getElementById('reportMeta').textContent = '생성: ' + d.toLocaleString('ko-KR');
+}
+
+// ── 비용 ─────────────────────────────────────────
 async function loadCostStats() {
   if (!sb) {
     document.getElementById('costStatBody').innerHTML = '<div style="color:#fb923c">⚙️ 설정에서 Supabase를 먼저 연결하세요</div>';
