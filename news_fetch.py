@@ -13,8 +13,17 @@ def main():
     print('📰 뉴스 RSS 수집 중...')
     settings = get_news_settings()
     max_per_feed = int(settings.get('news_max_per_feed', 5))
-    print(f'   피드당 최대 {max_per_feed}건')
 
+    # 자동 새로고침: 전체 삭제 후 신규 수집
+    refresh_enabled = settings.get('news_refresh_enabled', 'false').lower() == 'true'
+    if refresh_enabled:
+        from src.db_client import get_client
+        db = get_client()
+        db.table('news_items').delete() \
+          .neq('id', '00000000-0000-0000-0000-000000000000').execute()
+        print('🗑️ 기존 뉴스 전체 삭제 완료')
+
+    print(f'   피드당 최대 {max_per_feed}건')
     items = fetch_rss_items(max_per_feed=max_per_feed)
     saved = save_new_items(items)
     print(f'   총 {len(items)}건 수집 / {saved}건 신규 저장')

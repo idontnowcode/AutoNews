@@ -302,15 +302,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
             낮음 관심도 수집 제외
           </label>
         </div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <input id="newsDeleteDays" type="number" min="0" max="365" value="0"
-            style="width:48px;background:#ffffff12;border:1px solid #ffffff25;border-radius:6px;color:#fff;font-size:12px;padding:3px 6px;text-align:center"
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#ccc;cursor:pointer">
+            <input type="checkbox" id="newsRefreshEnabled"
+              style="width:14px;height:14px;cursor:pointer;accent-color:#FFD60A;margin-right:4px"
+              onchange="saveNewsSettings()">
+            뉴스 자동 새로고침
+          </label>
+          <input id="newsRefreshHours" type="number" min="1" max="72" value="3"
+            style="width:44px;background:#ffffff12;border:1px solid #ffffff25;border-radius:6px;color:#fff;font-size:12px;padding:3px 6px;text-align:center"
             onchange="saveNewsSettings()">
-          <span style="font-size:12px;color:#aaa">일 이상 지난 뉴스</span>
-          <button onclick="manualDeleteOldNews()"
-            style="font-size:11px;padding:3px 8px;background:#ef444422;border:1px solid #ef444455;border-radius:5px;color:#ef4444;cursor:pointer">
-            🗑️ 지금 삭제
-          </button>
+          <span style="font-size:12px;color:#aaa">시간마다 (전체 삭제 후 신규 수집)</span>
         </div>
       </div>
     </div>
@@ -928,14 +930,16 @@ function toggleNewsCategory(cat) {
 
 async function saveNewsSettings() {
   if (!sb) return;
-  var maxPerFeed  = document.getElementById('newsMaxPerFeed').value  || '5';
-  var deleteDays  = document.getElementById('newsDeleteDays').value  || '0';
-  var skipLow     = document.getElementById('newsSkipLow').checked ? 'true' : 'false';
+  var maxPerFeed      = document.getElementById('newsMaxPerFeed').value  || '5';
+  var skipLow         = document.getElementById('newsSkipLow').checked ? 'true' : 'false';
+  var refreshEnabled  = document.getElementById('newsRefreshEnabled').checked ? 'true' : 'false';
+  var refreshHours    = document.getElementById('newsRefreshHours').value || '3';
   var pairs = [
-    { key: 'news_max_per_feed',  value: maxPerFeed },
-    { key: 'news_delete_days',   value: deleteDays },
-    { key: 'news_categories',    value: _selectedCategories.join(',') },
-    { key: 'news_skip_low',      value: skipLow },
+    { key: 'news_max_per_feed',     value: maxPerFeed },
+    { key: 'news_categories',       value: _selectedCategories.join(',') },
+    { key: 'news_skip_low',         value: skipLow },
+    { key: 'news_refresh_enabled',  value: refreshEnabled },
+    { key: 'news_refresh_hours',    value: refreshHours },
   ];
   for (var p of pairs) {
     var exist = await sb.from('settings').select('key').eq('key', p.key);
@@ -951,15 +955,19 @@ async function saveNewsSettings() {
 async function loadNewsSettings() {
   if (!sb) return;
   var res = await sb.from('settings').select('key,value')
-    .in('key', ['news_max_per_feed','news_delete_days','news_categories','news_skip_low']);
+    .in('key', ['news_max_per_feed','news_categories','news_skip_low','news_refresh_enabled','news_refresh_hours']);
   if (res.error || !res.data) { renderCategoryBtns(); renderCatFilterBtns(); return; }
   res.data.forEach(function(r) {
     if (r.key === 'news_max_per_feed') {
       var el = document.getElementById('newsMaxPerFeed');
       if (el) el.value = r.value;
     }
-    if (r.key === 'news_delete_days') {
-      var el = document.getElementById('newsDeleteDays');
+    if (r.key === 'news_refresh_enabled') {
+      var el = document.getElementById('newsRefreshEnabled');
+      if (el) el.checked = r.value === 'true';
+    }
+    if (r.key === 'news_refresh_hours') {
+      var el = document.getElementById('newsRefreshHours');
       if (el) el.value = r.value;
     }
     if (r.key === 'news_categories' && r.value) {
@@ -974,19 +982,6 @@ async function loadNewsSettings() {
   renderCatFilterBtns();
 }
 
-async function manualDeleteOldNews() {
-  var days = parseInt(document.getElementById('newsDeleteDays').value || '0');
-  if (!days || days <= 0) { toast('삭제 기준 일수를 입력하세요 (1 이상)'); return; }
-  if (!confirm(days + '일 이상 지난 완료/실패 뉴스를 삭제하시겠습니까?')) return;
-  if (!sb) return;
-  var cutoff = new Date(Date.now() - days * 86400000).toISOString();
-  var res = await sb.from('news_items').delete()
-    .in('status', ['done','failed'])
-    .lt('created_at', cutoff);
-  if (res.error) { toast('오류: ' + res.error.message); return; }
-  toast('🗑️ 삭제 완료');
-  loadNews(_newsFilter);
-}
 
 // ── 비용 (실제 DB 기반) ───────────────────────────
 async function loadCostStats() {
