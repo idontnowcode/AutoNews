@@ -296,6 +296,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
           <span style="font-size:12px;color:#aaa">건</span>
         </div>
         <div style="display:flex;align-items:center;gap:6px">
+          <label style="display:flex;align-items:center;gap=5px;cursor:pointer;font-size:12px;color:#aaa">
+            <input id="newsSkipLow" type="checkbox" onchange="saveNewsSettings()"
+              style="width:14px;height:14px;cursor:pointer;accent-color:#FFD60A;margin-right:4px">
+            낮음 관심도 수집 제외
+          </label>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
           <input id="newsDeleteDays" type="number" min="0" max="365" value="0"
             style="width:48px;background:#ffffff12;border:1px solid #ffffff25;border-radius:6px;color:#fff;font-size:12px;padding:3px 6px;text-align:center"
             onchange="saveNewsSettings()">
@@ -923,10 +930,12 @@ async function saveNewsSettings() {
   if (!sb) return;
   var maxPerFeed  = document.getElementById('newsMaxPerFeed').value  || '5';
   var deleteDays  = document.getElementById('newsDeleteDays').value  || '0';
+  var skipLow     = document.getElementById('newsSkipLow').checked ? 'true' : 'false';
   var pairs = [
     { key: 'news_max_per_feed',  value: maxPerFeed },
     { key: 'news_delete_days',   value: deleteDays },
     { key: 'news_categories',    value: _selectedCategories.join(',') },
+    { key: 'news_skip_low',      value: skipLow },
   ];
   for (var p of pairs) {
     var exist = await sb.from('settings').select('key').eq('key', p.key);
@@ -942,7 +951,7 @@ async function saveNewsSettings() {
 async function loadNewsSettings() {
   if (!sb) return;
   var res = await sb.from('settings').select('key,value')
-    .in('key', ['news_max_per_feed','news_delete_days','news_categories']);
+    .in('key', ['news_max_per_feed','news_delete_days','news_categories','news_skip_low']);
   if (res.error || !res.data) { renderCategoryBtns(); renderCatFilterBtns(); return; }
   res.data.forEach(function(r) {
     if (r.key === 'news_max_per_feed') {
@@ -955,6 +964,10 @@ async function loadNewsSettings() {
     }
     if (r.key === 'news_categories' && r.value) {
       _selectedCategories = r.value.split(',').map(function(c){ return c.trim(); }).filter(Boolean);
+    }
+    if (r.key === 'news_skip_low') {
+      var el = document.getElementById('newsSkipLow');
+      if (el) el.checked = r.value === 'true';
     }
   });
   renderCategoryBtns();

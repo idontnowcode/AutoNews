@@ -105,6 +105,14 @@ def save_new_items(items: list[dict]) -> int:
     scored = score_items(items)
     print_score_summary(scored)
 
+    # 낮음 관심도 제외 설정 확인
+    settings = get_news_settings()
+    skip_low = settings.get('news_skip_low', 'false').lower() == 'true'
+    if skip_low:
+        before = len(scored)
+        scored = [it for it in scored if it.get('interest_level') != 'low']
+        print(f'   🔽 낮음 관심도 제외: {before - len(scored)}건 스킵 → {len(scored)}건 저장 대상')
+
     db = get_client()
     saved = 0
     for item in scored:
