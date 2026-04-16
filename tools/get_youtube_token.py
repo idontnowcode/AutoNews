@@ -18,7 +18,10 @@ try:
 except ImportError:
     sys.exit('google-auth-oauthlib 미설치:\n  pip install google-auth-oauthlib')
 
-SCOPES = ['https://www.googleapis.com/auth/youtube.upload']
+SCOPES = [
+    'https://www.googleapis.com/auth/youtube.upload',
+    'https://www.googleapis.com/auth/youtube.readonly',
+]
 SECRETS_FILE = os.path.join(os.path.dirname(__file__), '..', 'client_secrets.json')
 OUTPUT_FILE  = os.path.join(os.path.dirname(__file__), '..', 'token.json')
 
