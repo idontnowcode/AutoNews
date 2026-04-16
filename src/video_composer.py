@@ -25,7 +25,7 @@ TITLE_TOP    = 120
 IMG_Y        = 360
 IMG_SIZE     = 1080
 
-TYPING_SPEED = 22   # 초당 타이핑 글자 수 (자연스러운 속도)
+TYPING_SPEED = 8    # 초당 타이핑 글자 수 (음성과 함께 읽기 좋은 속도)
 
 
 def _get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
@@ -147,8 +147,7 @@ def _draw_subtitle(base_img: Image.Image, text: str,
         total_h = line_h * len(lines)
         y       = max(sub_top, sub_bottom - total_h)
         for line in lines:
-            lw = draw.textlength(line, font=sub_font)
-            draw.text(((W - lw) // 2, y), line, font=sub_font, fill=C_WHITE)
+            draw.text((pad, y), line, font=sub_font, fill=C_WHITE)  # 왼쪽 정렬
             y += line_h
 
     return np.array(img)
