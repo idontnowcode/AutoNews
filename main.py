@@ -4,12 +4,12 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from src.topic_manager    import get_next_topic, mark_in_progress, mark_done, mark_pending, mark_failed, save_video
-from src.settings_manager import check_should_run
+from src.settings_manager import check_should_run, get_settings
 from src.script_generator import generate_script
 from src.image_generator  import generate_all_images
 from src.tts_generator    import generate_segments_tts
 from src.video_composer   import compose_video
-from src.youtube_uploader import upload_shorts
+from src.youtube_uploader import upload_shorts, get_next_optimal_time
 
 load_dotenv()
 
@@ -19,6 +19,7 @@ def main():
     if not check_should_run():
         sys.exit(0)
 
+    settings = get_settings()
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
     os.makedirs('output', exist_ok=True)
     work_dir = f'output/{ts}'
@@ -60,7 +61,15 @@ def main():
         # ── 6. YouTube 업로드 ──────────────────────────────
         print('📤 YouTube 업로드 중...')
         try:
-            video_id = upload_shorts(video_path, script, youtube_title_prefix='[일분 경제] ')
+            publish_at = None
+            if settings.get('upload_schedule_enabled', 'false').lower() == 'true':
+                publish_at = get_next_optimal_time(
+                    days_str  = settings.get('upload_schedule_days', 'mon,tue'),
+                    hour_kst  = int(settings.get('upload_schedule_hour', '20')),
+                )
+                print(f'   📅 예약 발행 설정: {publish_at} (UTC)')
+            video_id = upload_shorts(video_path, script, youtube_title_prefix='[일분 경제] ',
+                                     publish_at=publish_at)
         except Exception as e:
             err = str(e)
             print(f'❌ 업로드 실패: {err}')

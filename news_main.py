@@ -14,8 +14,8 @@ from src.news_script_generator import generate_news_script
 from src.image_generator      import generate_all_images
 from src.tts_generator        import generate_segments_tts
 from src.video_composer       import compose_video
-from src.youtube_uploader     import upload_shorts
-from src.settings_manager     import check_news_should_run
+from src.youtube_uploader     import upload_shorts, get_next_optimal_time
+from src.settings_manager     import check_news_should_run, get_settings
 
 load_dotenv()
 
@@ -25,20 +25,21 @@ def main():
     if not check_news_should_run():
         sys.exit(0)
 
-    ts       = datetime.now().strftime('%Y%m%d_%H%M%S')
-    work_dir = f'output/news_{ts}'
+    settings     = get_settings()
+    ts           = datetime.now().strftime('%Y%m%d_%H%M%S')
+    work_dir     = f'output/news_{ts}'
     os.makedirs(work_dir, exist_ok=True)
 
     # ── 1. RSS 수집 + 관심도 채점 + DB 저장 ──────────
     print('📰 뉴스 RSS 수집 중...')
-    settings = get_news_settings()
-    max_per_feed = int(settings.get('news_max_per_feed', 5))
+    news_settings = get_news_settings()
+    max_per_feed = int(news_settings.get('news_max_per_feed', 5))
     items = fetch_rss_items(max_per_feed=max_per_feed)
     saved = save_new_items(items)
     print(f'   총 {len(items)}건 수집 / {saved}건 신규 저장')
 
     # ── 1-1. 오래된 뉴스 자동 삭제 ───────────────────
-    delete_days = int(settings.get('news_delete_days', 0))
+    delete_days = int(news_settings.get('news_delete_days', 0))
     if delete_days > 0:
         deleted = delete_old_news(delete_days)
         if deleted:
@@ -84,7 +85,15 @@ def main():
         # ── 7. YouTube 업로드 ─────────────────────────────
         print('📤 YouTube 업로드 중...')
         try:
-            video_id = upload_shorts(video_path, script, youtube_title_prefix='[일분 뉴스] ')
+            publish_at = None
+            if settings.get('upload_schedule_enabled', 'false').lower() == 'true':
+                publish_at = get_next_optimal_time(
+                    days_str  = settings.get('upload_schedule_days', 'mon,tue'),
+                    hour_kst  = int(settings.get('upload_schedule_hour', '20')),
+                )
+                print(f'   📅 예약 발행 설정: {publish_at} (UTC)')
+            video_id = upload_shorts(video_path, script, youtube_title_prefix='[일분 뉴스] ',
+                                     publish_at=publish_at)
         except Exception as e:
             err = str(e)
             print(f'❌ 업로드 실패: {err}')

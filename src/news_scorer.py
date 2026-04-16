@@ -23,6 +23,22 @@ KEYWORD_MED = [
     '우승', '결승', '챔피언', 'IPO', '상장', '실적', '영업이익',
 ]
 
+# ── 스포츠 핫이슈 키워드 (스포츠 카테고리에서 +3 추가) ─────────────
+KEYWORD_SPORTS_HOT = [
+    '이적', '데뷔', '우승', '결승', '탈락', '부상', '은퇴', '복귀',
+    '계약', '드래프트', '올스타', '챔피언', '첫경기', '선발', '홈런',
+    '득점', '골', '역전', '연장', '극적',
+]
+
+# ── 저성과 소재 패널티 키워드 (-3점) ────────────────────────────────
+KEYWORD_PENALTY = [
+    '선임', '원장', '임명', '위원장', '위원회',
+    '취임', '퇴임', '발령', '물밑', '회의 개최', '인사청문',
+]
+
+# ── 예고형 뉴스 패턴 (-2점) ──────────────────────────────────────
+KEYWORD_PREVIEW = ['예고', '전망', '예정', '맞대결']
+
 # ── 카테고리 기본 점수 ────────────────────────────────────────────
 CATEGORY_BASE = {
     '정치':   4,
@@ -70,7 +86,7 @@ def _cross_source_score(items: list[dict]) -> dict[int, int]:
             inter = len(s_i & s_j)
             union = len(s_i | s_j)
             jaccard = inter / union if union else 0
-            if jaccard >= 0.35:   # 35% 이상 겹치면 동일 사건으로 간주
+            if jaccard >= 0.4:    # 40% 이상 겹치면 동일 사건으로 간주 (강화)
                 scores[i] += 1
                 scores[j] += 1
 
@@ -78,19 +94,45 @@ def _cross_source_score(items: list[dict]) -> dict[int, int]:
     return {i: min(scores[i], 5) for i in range(n)}
 
 
-def _keyword_score(title: str, summary: str) -> int:
-    """HIGH 키워드 +3점, MED 키워드 +1점"""
+def _keyword_score(title: str, summary: str, category: str = '') -> int:
+    """
+    HIGH +3, MED +1, 스포츠 HOT +3,
+    패널티 키워드 -3, 예고형 -2
+    """
     text = (title + ' ' + summary).lower()
     score = 0
+
+    # 긍정 키워드
     for kw in KEYWORD_HIGH:
         if kw in text:
             score += 3
-            break   # 하나만 적용
+            break
     for kw in KEYWORD_MED:
         if kw in text:
             score += 1
             break
-    return min(score, 4)
+
+    # 스포츠 핫이슈 보너스 (스포츠 카테고리에서만)
+    if category == '스포츠':
+        for kw in KEYWORD_SPORTS_HOT:
+            if kw in title.lower():
+                score += 3
+                break
+
+    # 패널티: 저성과 행정/인사 키워드
+    for kw in KEYWORD_PENALTY:
+        if kw in title:
+            score -= 3
+            break
+
+    # 패널티: 예고형 뉴스 (결과 없는 예고)
+    title_end = title.rstrip().rstrip('!?')
+    for kw in KEYWORD_PREVIEW:
+        if kw in title and not title.rstrip().endswith(('!', '?')):
+            score -= 2
+            break
+
+    return score  # 음수 허용 (하한선 없음, 임계값으로 low 분류)
 
 
 def _category_score(category: str) -> int:
@@ -109,7 +151,8 @@ def score_items(items: list[dict]) -> list[dict]:
     result = []
     for i, item in enumerate(items):
         cs  = cross_scores.get(i, 0) * 3        # 최대 15점
-        ks  = _keyword_score(item.get('title', ''), item.get('summary', ''))  # 최대 4점
+        ks  = _keyword_score(item.get('title', ''), item.get('summary', ''),
+                              item.get('category', ''))                        # 가변 (음수 가능)
         cats = _category_score(item.get('category', '경제'))                   # 최대 4점
         total = cs + ks + cats
 
