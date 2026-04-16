@@ -141,16 +141,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
     <div class="header-sub" id="headerSub">연결 대기 중...</div>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
-    <!-- 자동 업로드 토글 -->
-    <div style="display:flex;align-items:center;gap:6px">
-      <span id="autoToggleLabel" style="font-size:11px;color:#555">자동</span>
-      <label style="position:relative;width:40px;height:22px;cursor:pointer" title="자동 업로드 ON/OFF">
-        <input type="checkbox" id="headerAutoEnabled" style="opacity:0;width:0;height:0" onchange="toggleHeaderAuto()">
-        <span id="headerAutoTrack" style="position:absolute;inset:0;background:#ffffff20;border-radius:11px;transition:.25s">
-          <span id="headerAutoKnob" style="position:absolute;left:2px;top:2px;width:18px;height:18px;background:#555;border-radius:50%;transition:.25s"></span>
-        </span>
-      </label>
-    </div>
+    <span id="schedHeaderBadge" style="font-size:11px;color:#555"></span>
     <button class="btn-gear" onclick="openModal()">⚙️</button>
   </div>
 </div>
@@ -475,43 +466,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
       <input id="cfgRepo" class="form-input" type="text" placeholder="username/repo">
     </div>
 
-    <!-- 자동 업로드 설정 구분선 -->
-    <div style="border-top:1px solid #ffffff15;margin:16px 0 14px"></div>
-    <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">🤖 자동 업로드</div>
-
-    <div class="form-group" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div>
-        <div style="font-size:14px;font-weight:600">자동 업로드</div>
-        <div style="font-size:11px;color:#555;margin-top:2px">OFF 시 수동 즉시 생성만 가능</div>
-      </div>
-      <label style="position:relative;width:44px;height:24px;cursor:pointer">
-        <input type="checkbox" id="cfgAutoEnabled" style="opacity:0;width:0;height:0">
-        <span id="cfgAutoToggle" onclick="toggleAutoSwitch()" style="position:absolute;inset:0;background:#ffffff20;border-radius:12px;transition:.2s;cursor:pointer">
-          <span id="cfgAutoKnob" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.2s"></span>
-        </span>
-      </label>
-    </div>
-
-    <div id="cfgIntervalRow" class="form-group" style="display:none">
-      <label class="form-label">업로드 간격</label>
-      <div style="display:flex;gap:8px">
-        <input id="cfgIntervalVal" class="form-input" type="number" min="1" max="168" value="1" style="width:80px;text-align:center">
-        <select id="cfgIntervalUnit" class="form-input">
-          <option value="hours">시간마다</option>
-          <option value="days" selected>일마다</option>
-        </select>
-      </div>
-      <div style="font-size:11px;color:#555;margin-top:4px">예) 1일마다 = 매일 1개 · 12시간마다 = 하루 2개</div>
-    </div>
-
     <!-- 예약 발행 설정 구분선 -->
     <div style="border-top:1px solid #ffffff15;margin:16px 0 14px"></div>
     <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">📅 예약 발행</div>
 
     <div class="form-group" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div>
-        <div style="font-size:14px;font-weight:600">업로드 예약 발행</div>
-        <div style="font-size:11px;color:#555;margin-top:2px">최적 요일·시간에 자동 예약</div>
+        <div style="font-size:14px;font-weight:600">예약 발행 활성화</div>
+        <div style="font-size:11px;color:#555;margin-top:2px">설정한 요일·시간에 YouTube 예약 업로드</div>
       </div>
       <div style="position:relative;width:44px;height:24px;cursor:pointer" onclick="toggleScheduleSwitch()">
         <input type="checkbox" id="cfgScheduleEnabled" style="display:none">
@@ -522,29 +484,41 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
     </div>
 
     <div id="cfgScheduleRow" style="display:none">
-      <div class="form-group" style="margin-bottom:10px">
+      <!-- 요일 -->
+      <div class="form-group" style="margin-bottom:12px">
         <label class="form-label">발행 요일</label>
         <div style="display:flex;gap:5px;margin-bottom:6px;flex-wrap:wrap">
           <button type="button" onclick="setScheduleDays('everyday')"
             style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;cursor:pointer">매일</button>
           <button type="button" onclick="setScheduleDays('mon,tue,wed,thu,fri')"
             style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">평일</button>
-          <button type="button" onclick="setScheduleDays('mon,tue')"
-            style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">월·화</button>
+          <button type="button" onclick="setScheduleDays('mon,wed,fri')"
+            style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">월수금</button>
           <button type="button" onclick="setScheduleDays('sat,sun')"
             style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">주말</button>
         </div>
-        <input id="cfgScheduleDays" class="form-input" type="text" value="mon,tue"
+        <input id="cfgScheduleDays" class="form-input" type="text" value="everyday"
           placeholder="everyday 또는 mon,tue,...">
-        <div style="font-size:11px;color:#555;margin-top:4px">everyday=매일 / mon=월 tue=화 wed=수 thu=목 fri=금 sat=토 sun=일</div>
+        <div style="font-size:11px;color:#555;margin-top:3px">everyday=매일 / mon 월 · tue 화 · wed 수 · thu 목 · fri 금 · sat 토 · sun 일</div>
       </div>
+
+      <!-- 시간+카테고리 슬롯 추가 -->
       <div class="form-group">
-        <label class="form-label">발행 시간 (KST, 쉼표로 여러 시간)</label>
-        <div style="display:flex;align-items:center;gap:8px">
-          <input id="cfgScheduleHours" class="form-input" type="text" value="20"
-            placeholder="9,20" style="width:100px;text-align:center">
-          <span style="font-size:12px;color:#555">시 (예: 9,20 = 오전 9시·오후 8시)</span>
+        <label class="form-label">발행 시간 · 콘텐츠 추가</label>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+          <input id="newSlotHour" type="number" min="0" max="23" value="20"
+            style="width:58px;background:#ffffff12;border:1px solid #ffffff25;border-radius:6px;color:#fff;font-size:13px;padding:5px 8px;text-align:center">
+          <span style="font-size:12px;color:#777">시 (KST)</span>
+          <select id="newSlotCategory"
+            style="background:#1a1a1a;border:1px solid #ffffff25;border-radius:6px;color:#fff;font-size:12px;padding:5px 8px;cursor:pointer">
+            <option value="news">📰 뉴스</option>
+            <option value="curriculum">📚 커리큘럼</option>
+          </select>
+          <button type="button" onclick="addScheduleSlot()"
+            style="padding:5px 14px;background:#FFD60A;color:#000;font-weight:700;font-size:14px;border:none;border-radius:6px;cursor:pointer">+</button>
         </div>
+        <!-- 추가된 슬롯 목록 -->
+        <div id="scheduleSlotList"></div>
       </div>
     </div>
 
@@ -619,21 +593,8 @@ function openModal() {
   if (sb) loadAutoSettings();
 }
 
-// ── 자동 업로드 설정 ──────────────────────────────
-function toggleAutoSwitch() {
-  var cb = document.getElementById('cfgAutoEnabled');
-  cb.checked = !cb.checked;
-  updateAutoToggleUI(cb.checked);
-}
-function updateAutoToggleUI(on) {
-  var toggle = document.getElementById('cfgAutoToggle');
-  var knob   = document.getElementById('cfgAutoKnob');
-  var row    = document.getElementById('cfgIntervalRow');
-  toggle.style.background = on ? '#FFD60A' : '#ffffff20';
-  knob.style.background   = on ? '#000'    : '#888';
-  knob.style.left         = on ? '22px'    : '2px';
-  row.style.display       = on ? 'block'   : 'none';
-}
+// ── 예약 발행 설정 ────────────────────────────────
+var _scheduleSlots = []; // [{hour:20, category:'curriculum'}, ...]
 
 function toggleScheduleSwitch() {
   var cb = document.getElementById('cfgScheduleEnabled');
@@ -653,6 +614,43 @@ function setScheduleDays(val) {
   document.getElementById('cfgScheduleDays').value = val;
 }
 
+function addScheduleSlot() {
+  var hour = parseInt(document.getElementById('newSlotHour').value, 10);
+  var cat  = document.getElementById('newSlotCategory').value;
+  if (isNaN(hour) || hour < 0 || hour > 23) { toast('0~23 사이 시간을 입력하세요'); return; }
+  var exists = _scheduleSlots.some(function(s){ return s.hour === hour && s.category === cat; });
+  if (exists) { toast('이미 추가된 슬롯입니다'); return; }
+  _scheduleSlots.push({hour: hour, category: cat});
+  _scheduleSlots.sort(function(a, b){ return a.hour - b.hour; });
+  renderScheduleSlots();
+}
+function removeScheduleSlot(idx) {
+  _scheduleSlots.splice(idx, 1);
+  renderScheduleSlots();
+}
+function renderScheduleSlots() {
+  var el = document.getElementById('scheduleSlotList');
+  if (!el) return;
+  if (_scheduleSlots.length === 0) {
+    el.innerHTML = '<div style="font-size:11px;color:#444;padding:6px 0">추가된 예약이 없습니다</div>';
+    return;
+  }
+  var CAT = {curriculum: {label:'📚 커리큘럼', color:'#FFD60A'}, news: {label:'📰 뉴스', color:'#34d399'}};
+  el.innerHTML = _scheduleSlots.map(function(s, i) {
+    var h = String(s.hour).padStart(2, '0');
+    var c = CAT[s.category] || {label: s.category, color: '#aaa'};
+    return '<div style="display:flex;align-items:center;justify-content:space-between;'
+      + 'padding:7px 10px;background:#ffffff0a;border-radius:8px;margin-bottom:5px">'
+      + '<span style="font-size:14px;font-weight:700;color:#fff;min-width:46px">' + h + ':00</span>'
+      + '<span style="font-size:11px;padding:2px 9px;background:' + c.color + '22;color:' + c.color
+        + ';border-radius:10px;border:1px solid ' + c.color + '44">' + c.label + '</span>'
+      + '<button type="button" onclick="removeScheduleSlot(' + i + ')" '
+        + 'style="font-size:16px;color:#ef4444;background:none;border:none;cursor:pointer;'
+        + 'padding:0 4px;line-height:1">−</button>'
+      + '</div>';
+  }).join('');
+}
+
 async function loadAutoSettings() {
   if (!sb) return;
   var res = await sb.from('settings').select('key,value');
@@ -660,43 +658,27 @@ async function loadAutoSettings() {
   var s = {};
   res.data.forEach(function(r){ s[r.key] = r.value; });
 
-  var enabled = s['auto_enabled'] !== 'false';
-  document.getElementById('cfgAutoEnabled').checked = enabled;
-  updateAutoToggleUI(enabled);
-
-  if (s['interval_value']) document.getElementById('cfgIntervalVal').value  = s['interval_value'];
-  if (s['interval_unit'])  document.getElementById('cfgIntervalUnit').value = s['interval_unit'];
-
   var schedEnabled = s['upload_schedule_enabled'] === 'true';
   document.getElementById('cfgScheduleEnabled').checked = schedEnabled;
   updateScheduleToggleUI(schedEnabled);
-  if (s['upload_schedule_days'])  document.getElementById('cfgScheduleDays').value  = s['upload_schedule_days'];
-  if (s['upload_schedule_hours']) document.getElementById('cfgScheduleHours').value = s['upload_schedule_hours'];
-  else if (s['upload_schedule_hour']) document.getElementById('cfgScheduleHours').value = s['upload_schedule_hour']; // 하위 호환
+  if (s['upload_schedule_days']) document.getElementById('cfgScheduleDays').value = s['upload_schedule_days'];
+  try { _scheduleSlots = JSON.parse(s['upload_schedule_slots'] || '[]'); } catch(e) { _scheduleSlots = []; }
+  renderScheduleSlots();
 }
 
 async function saveAutoSettings() {
   if (!sb) return;
-  var enabled       = document.getElementById('cfgAutoEnabled').checked;
-  var intVal        = document.getElementById('cfgIntervalVal').value  || '1';
-  var intUnit       = document.getElementById('cfgIntervalUnit').value || 'days';
-  var schedEnabled  = document.getElementById('cfgScheduleEnabled').checked;
-  var schedDays     = document.getElementById('cfgScheduleDays').value.trim()  || 'mon,tue';
-  var schedHours    = document.getElementById('cfgScheduleHours').value.trim() || '20';
-
+  var schedEnabled = document.getElementById('cfgScheduleEnabled').checked;
+  var schedDays    = document.getElementById('cfgScheduleDays').value.trim() || 'everyday';
   var rows = [
-    { key: 'auto_enabled',             value: String(enabled) },
-    { key: 'interval_value',           value: intVal },
-    { key: 'interval_unit',            value: intUnit },
-    { key: 'upload_schedule_enabled',  value: String(schedEnabled) },
-    { key: 'upload_schedule_days',     value: schedDays },
-    { key: 'upload_schedule_hours',    value: schedHours }
+    { key: 'upload_schedule_enabled', value: String(schedEnabled) },
+    { key: 'upload_schedule_days',    value: schedDays },
+    { key: 'upload_schedule_slots',   value: JSON.stringify(_scheduleSlots) }
   ];
   for (var i = 0; i < rows.length; i++) {
     await sb.from('settings').upsert(rows[i], { onConflict: 'key' });
   }
-  // 헤더 상태 업데이트
-  updateAutoHeaderBadge(enabled, intVal, intUnit);
+  updateScheduleHeaderBadge(schedEnabled, schedDays, _scheduleSlots);
 }
 function closeModal() {
   document.getElementById('modal').style.display = 'none';
@@ -711,80 +693,32 @@ async function loadAutoSettingsForHeader() {
   if (res.error || !res.data) return;
   var s = {};
   res.data.forEach(function(r){ s[r.key] = r.value; });
-  var enabled = s['auto_enabled'] !== 'false';
-  updateAutoHeaderBadge(enabled, s['interval_value'] || '1', s['interval_unit'] || 'days', s['auto_enabled_at'] || null);
+  var schedEnabled = s['upload_schedule_enabled'] === 'true';
+  var days = s['upload_schedule_days'] || 'everyday';
+  var slots = [];
+  try { slots = JSON.parse(s['upload_schedule_slots'] || '[]'); } catch(e) {}
+  updateScheduleHeaderBadge(schedEnabled, days, slots);
 }
 
-var _autoVal = '1', _autoUnit = 'days', _autoEnabledAt = null, _autoTimer = null;
-
-function updateAutoHeaderBadge(enabled, val, unit, enabledAt) {
-  _autoVal = val || '1'; _autoUnit = unit || 'days';
-  if (enabledAt) _autoEnabledAt = new Date(enabledAt);
-  _syncHeaderToggle(enabled);
-  _renderAutoBadge(enabled);
-  // 1분마다 남은 시간 갱신
-  if (_autoTimer) clearInterval(_autoTimer);
-  if (enabled) _autoTimer = setInterval(function(){ _renderAutoBadge(true); }, 60000);
-}
-
-function _renderAutoBadge(enabled) {
-  var sub = document.getElementById('headerSub');
-  if (!sub) return;
-  var base = sub.textContent.replace(/\s*·\s*(🟢|🔴).*/,'');
-  if (!enabled) { sub.textContent = base + ' · 🔴 자동OFF'; return; }
-
-  var intervalMs = parseInt(_autoVal) * (_autoUnit === 'hours' ? 3600000 : 86400000);
-  var badge = ' · 🟢 ' + _autoVal + (_autoUnit === 'hours' ? '시간' : '일') + '마다';
-
-  if (_autoEnabledAt && intervalMs > 0) {
-    var now = Date.now();
-    var elapsed = now - _autoEnabledAt.getTime();
-    var n = Math.ceil(elapsed / intervalMs);
-    if (n < 1) n = 1;
-    var nextTs = _autoEnabledAt.getTime() + n * intervalMs;
-    var diff   = nextTs - now;
-    if (diff < 0) diff = 0;
-    var dh = Math.floor(diff / 3600000);
-    var dm = Math.floor((diff % 3600000) / 60000);
-    var nextDate = new Date(nextTs);
-    var mm = String(nextDate.getMonth()+1).padStart(2,'0');
-    var dd = String(nextDate.getDate()).padStart(2,'0');
-    var hh = String(nextDate.getHours()).padStart(2,'0');
-    var mi = String(nextDate.getMinutes()).padStart(2,'0');
-    badge += ' · 다음 ' + mm+'/'+dd+' '+hh+':'+mi
-           + ' (' + (dh > 0 ? dh+'h ' : '') + dm+'m 후)';
+function updateScheduleHeaderBadge(enabled, days, slots) {
+  var badge = document.getElementById('schedHeaderBadge');
+  if (!badge) return;
+  if (!enabled || !slots || slots.length === 0) {
+    badge.textContent = '';
+    badge.style.color = '#555';
+    return;
   }
-  sub.textContent = base + badge;
+  var dayLabel = days === 'everyday' ? '매일'
+    : days === 'mon,tue,wed,thu,fri' ? '평일'
+    : days === 'sat,sun' ? '주말'
+    : days.replace(/mon/g,'월').replace(/tue/g,'화').replace(/wed/g,'수')
+          .replace(/thu/g,'목').replace(/fri/g,'금').replace(/sat/g,'토').replace(/sun/g,'일');
+  var times = slots.map(function(s){
+    return String(s.hour).padStart(2,'0') + '시(' + (s.category === 'news' ? '뉴스' : '커리') + ')';
+  }).join(' · ');
+  badge.textContent = '📅 ' + dayLabel + ' ' + times;
+  badge.style.color = '#FFD60A';
 }
-
-function _syncHeaderToggle(enabled) {
-  var cb     = document.getElementById('headerAutoEnabled');
-  var track  = document.getElementById('headerAutoTrack');
-  var knob   = document.getElementById('headerAutoKnob');
-  var label  = document.getElementById('autoToggleLabel');
-  if (!cb) return;
-  cb.checked = enabled;
-  if (track) track.style.background = enabled ? '#FFD60A88' : '#ffffff20';
-  if (knob)  { knob.style.background = enabled ? '#FFD60A' : '#555'; knob.style.left = enabled ? '20px' : '2px'; }
-  if (label) { label.style.color = enabled ? '#FFD60A' : '#555'; }
-}
-
-async function toggleHeaderAuto() {
-  if (!sb) { toast('⚙️ 먼저 Supabase 연결이 필요합니다'); return; }
-  var enabled = document.getElementById('headerAutoEnabled').checked;
-  // 모달 내 체크박스도 동기화
-  var modalCb = document.getElementById('cfgAutoEnabled');
-  if (modalCb) { modalCb.checked = enabled; updateAutoToggleUI(enabled); }
-  // ON 시 현재 시각을 기준 시각으로 저장
-  var rows = [{ key: 'auto_enabled', value: String(enabled) }];
-  if (enabled) {
-    var now = new Date().toISOString();
-    rows.push({ key: 'auto_enabled_at', value: now });
-    _autoEnabledAt = new Date(now);
-  }
-  for (var r of rows) await sb.from('settings').upsert(r, { onConflict: 'key' });
-  updateAutoHeaderBadge(enabled, _autoVal, _autoUnit, enabled ? _autoEnabledAt.toISOString() : null);
-  toast(enabled ? '🟢 자동 업로드 ON' : '🔴 자동 업로드 OFF');
 }
 
 // ── 탭 ───────────────────────────────────────────

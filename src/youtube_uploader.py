@@ -1,6 +1,7 @@
 import os
 import json
 from datetime import datetime, timezone, timedelta
+from typing import Optional
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
@@ -30,11 +31,16 @@ def _get_youtube_client():
 
 _DAY_MAP = {'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3, 'fri': 4, 'sat': 5, 'sun': 6}
 
-def get_next_optimal_time(days_str: str = 'mon,tue', hours_str: str = '20') -> str:
+
+def get_next_optimal_time(days_str: str = 'everyday',
+                          slots_json: str = '[]',
+                          category: str = 'news') -> str:
     """
-    설정된 요일/시간 조합 중 가장 가까운 다음 업로드 시각 반환 (UTC ISO 8601).
-    days_str : 'mon,tue' 또는 'everyday' (매일)
-    hours_str: '20' 또는 '9,20' (KST, 쉼표로 여러 시간 지정 가능)
+    설정된 요일·슬롯 조합 중 해당 카테고리의 가장 가까운 다음 발행 시각 반환 (UTC ISO 8601).
+
+    days_str  : 'everyday' 또는 'mon,tue,...'
+    slots_json: '[{"hour":9,"category":"news"},{"hour":20,"category":"curriculum"}]'
+    category  : 'news' 또는 'curriculum'
     """
     # 요일 파싱
     if days_str.strip().lower() == 'everyday':
@@ -43,35 +49,34 @@ def get_next_optimal_time(days_str: str = 'mon,tue', hours_str: str = '20') -> s
         target_days = [_DAY_MAP[d.strip().lower()] for d in days_str.split(',')
                        if d.strip().lower() in _DAY_MAP]
     if not target_days:
-        target_days = [0, 1]  # 기본 월·화
+        target_days = list(range(7))
 
-    # 시간 파싱 (KST → UTC)
-    hours_utc = []
-    for h in hours_str.split(','):
-        try:
-            hours_utc.append((int(h.strip()) - 9) % 24)
-        except ValueError:
-            pass
-    if not hours_utc:
-        hours_utc = [(20 - 9) % 24]  # 기본 20시 KST
+    # 슬롯에서 해당 카테고리 시간 추출 (KST → UTC)
+    try:
+        slots = json.loads(slots_json) if slots_json else []
+    except Exception:
+        slots = []
+    hours_kst = [s['hour'] for s in slots if s.get('category') == category]
+    if not hours_kst:
+        hours_kst = [20]  # fallback: 오후 8시 KST
+    hours_utc = [(h - 9) % 24 for h in hours_kst]
 
     now_utc = datetime.now(timezone.utc)
-    best: datetime | None = None
+    best: Optional[datetime] = None
 
     # 오늘 포함 7일, 모든 (요일 × 시간) 조합에서 가장 가까운 미래 시각 탐색
     for offset in range(8):
         candidate_date = now_utc + timedelta(days=offset)
         if candidate_date.weekday() not in target_days:
             continue
-        for hour_utc in hours_utc:
-            publish_dt = candidate_date.replace(hour=hour_utc, minute=0, second=0, microsecond=0)
+        for h_utc in hours_utc:
+            publish_dt = candidate_date.replace(hour=h_utc, minute=0, second=0, microsecond=0)
             if publish_dt <= now_utc:
-                continue  # 이미 지난 시각 스킵
+                continue
             if best is None or publish_dt < best:
                 best = publish_dt
 
     if best is None:
-        # fallback: 내일 첫 번째 시간
         best = (now_utc + timedelta(days=1)).replace(
             hour=hours_utc[0], minute=0, second=0, microsecond=0)
 

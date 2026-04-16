@@ -99,9 +99,9 @@ def main():
             publish_at = None
             if settings.get('upload_schedule_enabled', 'false').lower() == 'true':
                 publish_at = get_next_optimal_time(
-                    days_str  = settings.get('upload_schedule_days', 'mon,tue'),
-                    hours_str = settings.get('upload_schedule_hours',
-                                             settings.get('upload_schedule_hour', '20')),
+                    days_str   = settings.get('upload_schedule_days', 'everyday'),
+                    slots_json = settings.get('upload_schedule_slots', '[]'),
+                    category   = 'news',
                 )
                 print(f'   📅 예약 발행 설정: {publish_at} (UTC)')
             video_id = upload_shorts(video_path, script, youtube_title_prefix='[일분 뉴스] ',
