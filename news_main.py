@@ -17,7 +17,7 @@ from src.image_generator      import generate_all_images
 from src.tts_generator        import generate_segments_tts
 from src.video_composer       import compose_video
 from src.youtube_uploader     import upload_shorts, get_next_optimal_time
-from src.settings_manager     import check_news_should_run, get_settings
+from src.settings_manager     import check_news_should_run, get_settings, get_content_language
 
 load_dotenv()
 
@@ -28,9 +28,12 @@ def main():
         sys.exit(0)
 
     settings     = get_settings()
+    language     = get_content_language()
     ts           = datetime.now().strftime('%Y%m%d_%H%M%S')
     work_dir     = f'output/news_{ts}'
     os.makedirs(work_dir, exist_ok=True)
+    lang_flag = '🇺🇸' if language == 'en' else '🇰🇷'
+    print(f'{lang_flag} 콘텐츠 언어: {language.upper()}')
 
     news_settings = get_news_settings()
     max_per_feed  = int(news_settings.get('news_max_per_feed', 5))
@@ -84,7 +87,7 @@ def main():
 
         # ── 3. 스크립트 생성 ──────────────────────────────
         print('✍️  뉴스 스크립트 생성 중...')
-        script   = generate_news_script(news)
+        script   = generate_news_script(news, language=language)
         segments = script['segments']
         print(f'   제목: {script["title"]}')
 
@@ -98,7 +101,7 @@ def main():
         # ── 5. TTS 생성 ───────────────────────────────────
         print(f'🎙️  TTS 생성 중... ({len(segments)}개)')
         tts_dir     = os.path.join(work_dir, 'audio')
-        tts_results = generate_segments_tts(segments, tts_dir)
+        tts_results = generate_segments_tts(segments, tts_dir, language=language)
         for seg, tts in zip(segments, tts_results):
             seg['audio_path'] = tts['audio_path']
 
@@ -122,8 +125,11 @@ def main():
                     category   = 'news',
                 )
                 print(f'   📅 예약 발행 설정: {publish_at} (UTC)')
-            video_id = upload_shorts(video_path, script, youtube_title_prefix='[일분 뉴스] ',
-                                     publish_at=publish_at)
+            title_prefix = '[One Minute News] ' if language == 'en' else '[일분 뉴스] '
+            video_id = upload_shorts(video_path, script,
+                                     youtube_title_prefix=title_prefix,
+                                     publish_at=publish_at,
+                                     language=language)
         except Exception as e:
             err = str(e)
             print(f'❌ 업로드 실패: {err}')

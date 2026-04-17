@@ -125,7 +125,8 @@ def extract_json(raw: str) -> dict:
 import os as _os
 
 # 고정 멘트 (사운드/이미지 모두 한 번만 생성 후 재사용)
-OUTRO_NARRATION = "구독이랑 좋아요 눌러주시면 더 열심히 만들게요!"
+OUTRO_NARRATION    = "구독이랑 좋아요 눌러주시면 더 열심히 만들게요!"
+OUTRO_NARRATION_EN = "Like and subscribe for more!"
 
 OUTRO_IMAGE_PROMPT = (
     "Cute cartoon character smiling and waving at the camera, "
@@ -134,41 +135,100 @@ OUTRO_IMAGE_PROMPT = (
 )
 
 # 프로젝트 루트 기준 고정 asset 경로
-_ASSET_DIR   = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'assets')
-OUTRO_IMAGE  = _os.path.join(_ASSET_DIR, 'outro_image.png')
-OUTRO_AUDIO  = _os.path.join(_ASSET_DIR, 'outro_audio.mp3')
+_ASSET_DIR      = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'assets')
+OUTRO_IMAGE     = _os.path.join(_ASSET_DIR, 'outro_image.png')
+OUTRO_AUDIO     = _os.path.join(_ASSET_DIR, 'outro_audio.mp3')
+OUTRO_AUDIO_EN  = _os.path.join(_ASSET_DIR, 'outro_audio_en.mp3')
 
 
-def append_outro(segments: list) -> list:
+def append_outro(segments: list, language: str = 'ko') -> list:
     """마지막 세그먼트 뒤에 구독/좋아요 유도 멘트 추가.
-    assets/outro_image.png · outro_audio.mp3 가 존재하면 해당 파일을 직접 주입하여
-    DALL-E 이미지 생성 및 TTS 생성을 건너뜁니다.
+    assets/outro_image.png · outro_audio[_en].mp3 가 존재하면 직접 주입.
     """
     idx = max((s.get('index', i) for i, s in enumerate(segments)), default=-1) + 1
+    narration  = OUTRO_NARRATION_EN if language == 'en' else OUTRO_NARRATION
+    audio_file = OUTRO_AUDIO_EN     if language == 'en' else OUTRO_AUDIO
     seg: dict = {
         'index':        idx,
-        'narration':    OUTRO_NARRATION,
+        'narration':    narration,
         'image_prompt': OUTRO_IMAGE_PROMPT,
     }
     if _os.path.exists(OUTRO_IMAGE):
         seg['image_path'] = OUTRO_IMAGE
-    if _os.path.exists(OUTRO_AUDIO):
-        seg['audio_path'] = OUTRO_AUDIO
+    if _os.path.exists(audio_file):
+        seg['audio_path'] = audio_file
     segments.append(seg)
     img_ok = "OK" if _os.path.exists(OUTRO_IMAGE) else "MISSING"
-    aud_ok = "OK" if _os.path.exists(OUTRO_AUDIO) else "MISSING"
-    print(f'   [아웃트로] idx={idx} | image={img_ok} | audio={aud_ok}')
+    aud_ok = "OK" if _os.path.exists(audio_file)  else "MISSING"
+    print(f'   [아웃트로] idx={idx} | lang={language} | image={img_ok} | audio={aud_ok}')
     return segments
 
 
-def generate_script(topic: dict) -> dict:
+# ── 영어 프롬프트 ─────────────────────────────────────
+PROMPT_TEMPLATE_EN = '''
+You are a content creator for an English economics education YouTube Shorts channel.
+Create a 60-second educational video script on the topic below.
+
+Topic: {title}
+Level: {level}
+Category: {category}
+Description: {description}
+
+[Requirements]
+- Target audience: 20-30s learning economics for the first time
+- Number of segments: 6-8 (based on topic complexity)
+- ★ Each segment narration MUST be 10-20 words ★
+  → One short punchy sentence, core point only
+  → Split complex ideas across multiple segments
+- ★ Tone: conversational, friendly, like explaining to a friend ★
+  Good: "Here's the thing..." / "Think of it this way..." / "So basically..."
+  Bad: "It represents..." / "It indicates..." (no textbook language)
+  → Use contractions (it's, you'll, they're) and casual phrasing
+- Segment structure (8 segments):
+    0: Hook — curiosity-sparking opener
+    1: One-line concept definition
+    2: How it works — part 1
+    3: How it works — part 2
+    4: Real-life everyday example
+    5: Key number or stat
+    6: Core takeaway
+    7: Punchy sign-off
+
+[Image prompt rules — gpt-image-1 cartoon education style]
+- Write in English only
+- Describe a cartoon scene visually explaining the narration
+- Use cute characters, charts, arrows, speech bubbles
+- First segment (index 0): topic object + curious character or question mark
+- Last segment: "aha!" expression + checkmark or rising graph
+
+[Output — return ONLY the JSON below, segments array length 6-8]
+{{
+    "title": "Hook title in one of these styles (avoid plain 'What is X?'):\\n  A) News-linked: 'Fed raised rates — but what IS a rate hike?' \\n  B) Number+Relatable: 'Why your $3,000/mo salary feels like nothing' \\n  C) Question: 'What is inflation? Explained in 30 sec' \\n  — Include a number or emotion word. Max 70 chars",
+    "description": "YouTube description under 150 chars — no time expressions like 'in 60 seconds'",
+    "hashtags": ["economics", "finance", "investing", "topic_tag1", "topic_tag2"],
+    "segments": [
+        {{
+            "index": 0,
+            "narration": "★ 10-20 words, one punchy sentence ★",
+            "image_prompt": "[Cartoon scene matching the narration]"
+        }}
+    ]
+}}
+'''
+
+
+def generate_script(topic: dict, language: str = 'ko') -> dict:
+    template = PROMPT_TEMPLATE_EN if language == 'en' else PROMPT_TEMPLATE
+    title_key = 'title_en' if language == 'en' else 'title'
+    # title_en 없으면 title로 fallback
+    title = topic.get(title_key) or topic.get('title', '')
     msg = _get_client().messages.create(
         model='claude-sonnet-4-6',
         max_tokens=2048,
         messages=[{
             'role': 'user',
-            'content': PROMPT_TEMPLATE.format(
-                title=topic.get('title', ''),
+            'content': template.format(
+                title=title,
                 level=topic.get('level', 'basic'),
                 category=topic.get('category', ''),
                 description=topic.get('description', '')
@@ -176,7 +236,7 @@ def generate_script(topic: dict) -> dict:
         }]
     )
     result = extract_json(msg.content[0].text.strip())
-    if 'title' in result:
+    if language == 'ko' and 'title' in result:
         result['title'] = fix_title_grammar(result['title'])
-    result['segments'] = append_outro(result.get('segments', []))
+    result['segments'] = append_outro(result.get('segments', []), language=language)
     return result

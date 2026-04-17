@@ -37,7 +37,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: assets/
-          key: outro-assets-v1
+          key: outro-assets-v2
 
       - name: 아웃트로 asset 생성 (캐시 없을 때)
         if: steps.cache-outro.outputs.cache-hit != 'true'
@@ -54,6 +54,7 @@ jobs:
           SUPABASE_KEY:        ${{ secrets.SUPABASE_KEY }}
           ELEVENLABS_API_KEY:  ${{ secrets.ELEVENLABS_API_KEY }}
           YOUTUBE_TOKEN:       ${{ secrets.YOUTUBE_TOKEN }}
+          YOUTUBE_TOKEN_EN:    ${{ secrets.YOUTUBE_TOKEN_EN }}
           FORCE_RUN:           ${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}
           NEWS_ID:             ${{ github.event.inputs.news_id }}
         run: python news_main.py

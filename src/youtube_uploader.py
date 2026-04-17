@@ -8,9 +8,18 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 
-def _get_youtube_client():
-    """환경 변수에서 토큰 읽기 + 만료 시 자동 갱신"""
-    token_json = os.environ['YOUTUBE_TOKEN']
+def _get_youtube_client(language: str = 'ko'):
+    """환경 변수에서 토큰 읽기 + 만료 시 자동 갱신.
+    language='en' → YOUTUBE_TOKEN_EN 사용 (없으면 YOUTUBE_TOKEN fallback)
+    """
+    token_env = 'YOUTUBE_TOKEN'
+    if language == 'en' and os.environ.get('YOUTUBE_TOKEN_EN'):
+        token_env = 'YOUTUBE_TOKEN_EN'
+        print('   🇺🇸 영어 채널 토큰(YOUTUBE_TOKEN_EN) 사용')
+    elif language == 'en':
+        print('   ⚠️  YOUTUBE_TOKEN_EN 미설정 — 기본 토큰(YOUTUBE_TOKEN) 사용')
+
+    token_json = os.environ[token_env]
     creds = Credentials.from_authorized_user_info(json.loads(token_json))
 
     # 액세스 토큰 만료 시 refresh_token으로 자동 갱신
@@ -21,9 +30,8 @@ def _get_youtube_client():
             print('   갱신 완료')
         else:
             raise RuntimeError(
-                'YouTube OAuth 토큰이 유효하지 않습니다. '
-                'tools/refresh_youtube_token.py를 로컬에서 실행하여 '
-                'YOUTUBE_TOKEN secret을 재발급하세요.'
+                f'YouTube OAuth 토큰({token_env})이 유효하지 않습니다. '
+                'tools/refresh_youtube_token.py를 로컬에서 실행하여 secret을 재발급하세요.'
             )
 
     return build('youtube', 'v3', credentials=creds)
@@ -85,17 +93,19 @@ def get_next_optimal_time(days_str: str = 'everyday',
 
 def upload_shorts(video_path: str, script_data: dict,
                   youtube_title_prefix: str = '',
-                  publish_at: str = None) -> str:
+                  publish_at: str = None,
+                  language: str = 'ko') -> str:
     """YouTube Shorts 업로드 → 영상 ID 반환
-    youtube_title_prefix: 영상 속 제목과 별개로 유튜브 업로드 제목 앞에 붙는 태그
-                          예) '[일분 경제] ', '[일분 뉴스] '
+    youtube_title_prefix: 유튜브 제목 앞 태그 (예: '[일분 경제] ', '[One Minute Economy] ')
+    language: 'ko' → YOUTUBE_TOKEN / 'en' → YOUTUBE_TOKEN_EN
     """
-    youtube = _get_youtube_client()
+    youtube = _get_youtube_client(language=language)
 
     raw_title   = script_data['title']
     yt_title    = f"{youtube_title_prefix}{raw_title}"[:100]
     hashtags    = ' '.join([f'#{t}' for t in script_data.get('hashtags', [])])
     description = f"{script_data.get('description', '')}\n\n{hashtags} #Shorts"
+    yt_language = 'en' if language == 'en' else 'ko'
 
     request = youtube.videos().insert(
         part='snippet,status',
@@ -105,7 +115,7 @@ def upload_shorts(video_path: str, script_data: dict,
                 'description':     description,
                 'tags':            script_data.get('hashtags', []) + ['Shorts'],
                 'categoryId':      '25',
-                'defaultLanguage': 'ko',
+                'defaultLanguage': yt_language,
             },
             'status': {
                 'privacyStatus':           'private' if publish_at else 'public',

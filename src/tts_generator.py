@@ -1,7 +1,13 @@
 import os
 import requests
 
-DEFAULT_VOICE_ID = 'pNInz6obpgDQGcFmaJgB'  # Adam (multilingual)
+DEFAULT_VOICE_ID = 'pNInz6obpgDQGcFmaJgB'  # Adam (multilingual) — Korean
+EN_VOICE_ID      = '21m00Tcm4TlvDq8ikWAM'  # Rachel — natural American English
+
+
+def get_voice_id(language: str = 'ko') -> str:
+    """언어에 맞는 ElevenLabs Voice ID 반환"""
+    return EN_VOICE_ID if language == 'en' else DEFAULT_VOICE_ID
 
 
 def generate_tts(text: str, output_path: str,
@@ -35,11 +41,13 @@ def generate_tts(text: str, output_path: str,
     return output_path
 
 
-def generate_segments_tts(segments: list, out_dir: str) -> list:
+def generate_segments_tts(segments: list, out_dir: str, language: str = 'ko') -> list:
     """세그먼트별 TTS 생성 → [(audio_path, narration), ...] 반환.
     세그먼트에 audio_path 가 이미 설정돼 있으면 해당 파일을 그대로 사용 (고정 asset 재사용).
+    language: 'ko' → Adam 음성 / 'en' → Rachel 음성
     """
     os.makedirs(out_dir, exist_ok=True)
+    voice_id = get_voice_id(language)
     results = []
     for seg in segments:
         idx       = seg['index']
@@ -52,7 +60,7 @@ def generate_segments_tts(segments: list, out_dir: str) -> list:
             continue
 
         path = os.path.join(out_dir, f'audio_{idx:02d}.mp3')
-        print(f'   TTS [{idx+1}/{len(segments)}]: {narration[:30]}...')
-        generate_tts(narration, path)
+        print(f'   TTS [{idx+1}/{len(segments)}]: {narration[:35]}...')
+        generate_tts(narration, path, voice_id=voice_id)
         results.append({'audio_path': path, 'narration': narration, 'index': idx})
     return results

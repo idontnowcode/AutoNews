@@ -1,9 +1,11 @@
 """
 아웃트로 고정 asset 생성 (최초 1회만 실행)
-생성 결과: assets/outro_image.png, assets/outro_audio.mp3
+생성 결과: assets/outro_image.png, assets/outro_audio.mp3, assets/outro_audio_en.mp3
 
 실행 방법:
-    python tools/generate_outro_assets.py
+    python tools/generate_outro_assets.py          # 한국어 + 영어 모두 생성
+    python tools/generate_outro_assets.py --ko     # 한국어만
+    python tools/generate_outro_assets.py --en     # 영어만
 """
 import os
 import sys
@@ -16,35 +18,52 @@ sys.path.insert(0, _ROOT)
 from dotenv import load_dotenv
 load_dotenv(os.path.join(_ROOT, '.env'))
 
-from src.script_generator import OUTRO_NARRATION, OUTRO_IMAGE_PROMPT, OUTRO_IMAGE, OUTRO_AUDIO
+from src.script_generator import (OUTRO_NARRATION, OUTRO_NARRATION_EN,
+                                   OUTRO_IMAGE_PROMPT, OUTRO_IMAGE,
+                                   OUTRO_AUDIO, OUTRO_AUDIO_EN)
 from src.image_generator   import generate_slide_image
-from src.tts_generator     import generate_tts
+from src.tts_generator     import generate_tts, DEFAULT_VOICE_ID, EN_VOICE_ID
 
 os.makedirs(os.path.dirname(OUTRO_IMAGE), exist_ok=True)
 
 
-def generate():
-    # ── 이미지 ─────────────────────────────────────────────────────
+def generate(mode: str = 'all'):
+    # ── 이미지 (한/영 공용) ────────────────────────────────────────
     if os.path.exists(OUTRO_IMAGE):
         print(f'✅ 이미지 이미 존재: {OUTRO_IMAGE}')
     else:
-        print(f'🎨 아웃트로 이미지 생성 중...')
+        print('🎨 아웃트로 이미지 생성 중...')
         generate_slide_image(OUTRO_IMAGE_PROMPT, OUTRO_IMAGE)
         print(f'   저장: {OUTRO_IMAGE}')
 
-    # ── TTS ────────────────────────────────────────────────────────
-    if os.path.exists(OUTRO_AUDIO):
-        print(f'✅ 오디오 이미 존재: {OUTRO_AUDIO}')
-    else:
-        print(f'🎙️  아웃트로 TTS 생성 중...')
-        print(f'   멘트: {OUTRO_NARRATION}')
-        generate_tts(OUTRO_NARRATION, OUTRO_AUDIO)
-        print(f'   저장: {OUTRO_AUDIO}')
+    # ── 한국어 TTS ─────────────────────────────────────────────────
+    if mode in ('all', 'ko'):
+        if os.path.exists(OUTRO_AUDIO):
+            print(f'✅ 한국어 오디오 이미 존재: {OUTRO_AUDIO}')
+        else:
+            print('🎙️  한국어 아웃트로 TTS 생성 중...')
+            print(f'   멘트: {OUTRO_NARRATION}')
+            generate_tts(OUTRO_NARRATION, OUTRO_AUDIO, voice_id=DEFAULT_VOICE_ID)
+            print(f'   저장: {OUTRO_AUDIO}')
+
+    # ── 영어 TTS ───────────────────────────────────────────────────
+    if mode in ('all', 'en'):
+        if os.path.exists(OUTRO_AUDIO_EN):
+            print(f'✅ 영어 오디오 이미 존재: {OUTRO_AUDIO_EN}')
+        else:
+            print('🎙️  영어 아웃트로 TTS 생성 중...')
+            print(f'   멘트: {OUTRO_NARRATION_EN}')
+            generate_tts(OUTRO_NARRATION_EN, OUTRO_AUDIO_EN, voice_id=EN_VOICE_ID)
+            print(f'   저장: {OUTRO_AUDIO_EN}')
 
     print('\n✅ 아웃트로 asset 준비 완료!')
-    print('   이제 모든 영상 말미에 이 이미지/사운드가 고정으로 사용됩니다.')
-    print('   멘트를 바꾸려면 src/script_generator.py의 OUTRO_NARRATION을 수정 후 재실행하세요.')
 
 
 if __name__ == '__main__':
-    generate()
+    args = sys.argv[1:]
+    if '--ko' in args:
+        generate('ko')
+    elif '--en' in args:
+        generate('en')
+    else:
+        generate('all')

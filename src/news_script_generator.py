@@ -74,6 +74,53 @@ IMAGE_RULE_DEFAULT = (
 )
 
 
+NEWS_PROMPT_EN = '''
+You are a content creator for an English news YouTube Shorts channel.
+Turn the news article below into a 60-second Shorts script.
+
+News Title: {title}
+Source: {source}
+Summary: {summary}
+Category: {category}
+
+[Requirements]
+- Target: 20-40s interested in {category}
+- Segments: 6-8
+- ★ Each narration MUST be 10-20 words ★
+- Simplify the news clearly (minimize jargon)
+- ★ Tone: conversational, like telling a friend ★
+  Good: "Okay so here's what happened..." / "This is actually a big deal because..."
+  Bad: "announced" / "stated" / "will be implemented" (no news-anchor language)
+  → Use contractions and casual phrasing
+- Structure:
+    0: One-line headline hook (grab attention — conversational)
+    1: What happened? (simple, friendly)
+    2-5: Key facts / background / numbers (informal)
+    Last: Impact or outlook (short, punchy)
+
+[Image prompt rules — English only]
+- Write in English only
+- {image_rule}
+- Use characters, charts, arrows, buildings, icons
+- First segment: core news object + surprised character
+- Last segment: affected people or future outlook image
+
+[Output — return ONLY the JSON below]
+{{
+    "title": "Core news title in English (under 70 chars)",
+    "description": "YouTube description under 150 chars — no time expressions",
+    "hashtags": ["{category}news", "{category}", "newsupdate", "topic_tag"],
+    "person_name": "key person's name (null if none)",
+    "segments": [
+        {{
+            "index": 0,
+            "narration": "★ 10-20 words, one punchy sentence ★",
+            "image_prompt": "[English cartoon image prompt]"
+        }}
+    ]
+}}
+'''
+
 FACT_CHECK_PROMPT = '''
 아래는 뉴스 기사를 바탕으로 작성된 YouTube Shorts 스크립트입니다.
 웹 검색을 통해 주요 사실(수치, 날짜, 기관명, 정책 내용 등)을 팩트체크하고,
@@ -162,8 +209,8 @@ def _detect_person(title: str, summary: str) -> str | None:
     return None
 
 
-def generate_news_script(news_item: dict) -> dict:
-    category = news_item.get('category', '경제')
+def generate_news_script(news_item: dict, language: str = 'ko') -> dict:
+    category = news_item.get('category', '경제' if language == 'ko' else 'economy')
 
     # 인물 감지 → 이미지 규칙 분기
     person = _detect_person(
@@ -177,12 +224,13 @@ def generate_news_script(news_item: dict) -> dict:
         image_rule = IMAGE_RULE_DEFAULT
 
     # ── 1단계: 스크립트 초안 생성 ─────────────────────
+    prompt_tpl = NEWS_PROMPT_EN if language == 'en' else NEWS_PROMPT
     msg = _get_client().messages.create(
         model='claude-sonnet-4-6',
         max_tokens=2048,
         messages=[{
             'role': 'user',
-            'content': NEWS_PROMPT.format(
+            'content': prompt_tpl.format(
                 title=news_item.get('title', ''),
                 source=news_item.get('source', ''),
                 summary=news_item.get('summary', news_item.get('title', '')),
@@ -193,8 +241,8 @@ def generate_news_script(news_item: dict) -> dict:
     )
     result = extract_json(msg.content[0].text.strip())
 
-    # 제목 후처리 (이란/란 문법 교정 — 해당하는 경우)
-    if 'title' in result and ('이란?' in result['title'] or '란?' in result['title']):
+    # 제목 후처리 (한국어 이란/란 문법 교정)
+    if language == 'ko' and 'title' in result and ('이란?' in result['title'] or '란?' in result['title']):
         result['title'] = fix_title_grammar(result['title'])
 
     # ── 2단계: 웹 검색 팩트체크 ──────────────────────
@@ -202,6 +250,6 @@ def generate_news_script(news_item: dict) -> dict:
     result = _fact_check_script(news_item, result)
 
     # ── 3단계: 구독/좋아요 유도 아웃트로 추가 ────────
-    result['segments'] = append_outro(result.get('segments', []))
+    result['segments'] = append_outro(result.get('segments', []), language=language)
 
     return result

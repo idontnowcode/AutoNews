@@ -109,3 +109,13 @@ def check_should_run() -> bool:
 def check_news_should_run() -> bool:
     """뉴스 파이프라인 실행 여부"""
     return _check_schedule_enabled('뉴스', 'news')
+
+
+def get_content_language() -> str:
+    """콘텐츠 생성 언어 설정 ('ko' 또는 'en', 기본값 'ko')"""
+    try:
+        settings = get_settings()
+        lang = settings.get('content_language', 'ko').lower().strip()
+        return lang if lang in ('ko', 'en') else 'ko'
+    except Exception:
+        return 'ko'

@@ -137,8 +137,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 <!-- 헤더 -->
 <div class="header">
   <div>
-    <div class="header-title">일분 스튜디오</div>
-    <div class="header-sub" id="headerSub">연결 대기 중...</div>
+    <div style="display:flex;align-items:baseline;gap:7px">
+      <div class="header-title">일분 스튜디오</div>
+      <span id="langHeaderBadge" style="font-size:11px;color:#888"></span>
+    </div>
+    <div id="headerSub" style="font-size:11px;color:#666;margin-top:1px">연결 대기 중...</div>
+    <div id="dualClock" style="font-size:11px;color:#555;margin-top:2px;letter-spacing:.2px"></div>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <span id="schedHeaderBadge" style="font-size:11px;color:#555"></span>
@@ -494,6 +498,19 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
       <input id="cfgRepo" class="form-input" type="text" placeholder="username/repo">
     </div>
 
+    <!-- 콘텐츠 언어 설정 -->
+    <div style="border-top:1px solid #ffffff15;margin:16px 0 14px"></div>
+    <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">🌐 콘텐츠 언어</div>
+    <div class="form-group">
+      <div style="display:flex;gap:8px">
+        <button type="button" id="langBtnKo" onclick="setContentLang('ko')"
+          style="flex:1;padding:10px;border-radius:8px;border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;font-size:13px;font-weight:700;cursor:pointer">🇰🇷 한국어</button>
+        <button type="button" id="langBtnEn" onclick="setContentLang('en')"
+          style="flex:1;padding:10px;border-radius:8px;border:1px solid #ffffff25;background:transparent;color:#888;font-size:13px;font-weight:700;cursor:pointer">🇺🇸 English</button>
+      </div>
+      <div id="langHint" style="font-size:11px;color:#555;margin-top:6px">한국어 Shorts 생성 · 국내 채널(YOUTUBE_TOKEN)에 업로드</div>
+    </div>
+
     <!-- 예약 발행 설정 구분선 -->
     <div style="border-top:1px solid #ffffff15;margin:16px 0 14px"></div>
     <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">📅 예약 발행</div>
@@ -535,8 +552,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
         <label class="form-label">발행 시간 · 콘텐츠 추가</label>
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
           <input id="newSlotHour" type="number" min="0" max="23" value="20"
+            oninput="updateEstHint(this.value)"
             style="width:58px;background:#ffffff12;border:1px solid #ffffff25;border-radius:6px;color:#fff;font-size:13px;padding:5px 8px;text-align:center">
           <span style="font-size:12px;color:#777">시 (KST)</span>
+          <span id="estHint" style="font-size:11px;color:#555"></span>
           <select id="newSlotCategory"
             style="background:#1a1a1a;border:1px solid #ffffff25;border-radius:6px;color:#fff;font-size:12px;padding:5px 8px;cursor:pointer">
             <option value="news">📰 뉴스</option>
@@ -563,6 +582,63 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 // ── 설정 ─────────────────────────────────────────
 var sb = null;
 var cfg = {};
+
+// ── 듀얼 시계 ────────────────────────────────────
+function isEDT() {
+  // 미국 동부 서머타임: 3월~11월 (근사값)
+  var m = new Date().getMonth() + 1;
+  return m >= 3 && m <= 11;
+}
+function kstToEt(h) {
+  var offset = isEDT() ? -13 : -14;
+  return ((h + offset) % 24 + 24) % 24;
+}
+function updateDualClock() {
+  try {
+    var now = new Date();
+    var kst = now.toLocaleString('ko-KR', {timeZone:'Asia/Seoul',    hour:'2-digit', minute:'2-digit', hour12:false});
+    var et  = now.toLocaleString('en-US', {timeZone:'America/New_York', hour:'2-digit', minute:'2-digit', hour12:false});
+    var parts = new Intl.DateTimeFormat('en-US', {timeZone:'America/New_York', timeZoneName:'short'}).formatToParts(now);
+    var etLabel = (parts.find(function(p){return p.type==='timeZoneName';}) || {value:'ET'}).value;
+    var el = document.getElementById('dualClock');
+    if (el) el.textContent = '🇰🇷 ' + kst + ' KST  ·  🇺🇸 ' + et + ' ' + etLabel;
+  } catch(e) {}
+}
+setInterval(updateDualClock, 1000);
+updateDualClock();
+
+// KST 입력 → ET 힌트
+function updateEstHint(val) {
+  var h = parseInt(val, 10);
+  var el = document.getElementById('estHint');
+  if (!el) return;
+  if (isNaN(h) || h < 0 || h > 23) { el.textContent = ''; return; }
+  var etH = kstToEt(h);
+  var label = isEDT() ? 'EDT' : 'EST';
+  el.textContent = '= ' + String(etH).padStart(2,'0') + ':00 ' + label;
+}
+
+// ── 콘텐츠 언어 ───────────────────────────────────
+var _contentLang = 'ko';
+function setContentLang(lang) {
+  _contentLang = lang;
+  var ko   = document.getElementById('langBtnKo');
+  var en   = document.getElementById('langBtnEn');
+  var hint = document.getElementById('langHint');
+  var badge = document.getElementById('langHeaderBadge');
+  if (!ko || !en) return;
+  if (lang === 'ko') {
+    ko.style.cssText = 'flex:1;padding:10px;border-radius:8px;border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;font-size:13px;font-weight:700;cursor:pointer';
+    en.style.cssText = 'flex:1;padding:10px;border-radius:8px;border:1px solid #ffffff25;background:transparent;color:#888;font-size:13px;font-weight:700;cursor:pointer';
+    if (hint)  hint.textContent  = '한국어 Shorts 생성 · 국내 채널(YOUTUBE_TOKEN)에 업로드';
+    if (badge) { badge.textContent = '🇰🇷'; badge.style.color = '#FFD60A'; }
+  } else {
+    en.style.cssText = 'flex:1;padding:10px;border-radius:8px;border:1px solid #4f9eff55;background:#4f9eff22;color:#4f9eff;font-size:13px;font-weight:700;cursor:pointer';
+    ko.style.cssText = 'flex:1;padding:10px;border-radius:8px;border:1px solid #ffffff25;background:transparent;color:#888;font-size:13px;font-weight:700;cursor:pointer';
+    if (hint)  hint.textContent  = 'English Shorts 생성 · 해외 채널(YOUTUBE_TOKEN_EN)에 업로드';
+    if (badge) { badge.textContent = '🇺🇸'; badge.style.color = '#4f9eff'; }
+  }
+}
 
 function loadCfg() {
   try { cfg = JSON.parse(localStorage.getItem('econ_cfg') || '{}'); } catch(e) { cfg = {}; }
@@ -666,12 +742,17 @@ function renderScheduleSlots() {
     return;
   }
   var CAT = {curriculum: {label:'📚 커리큘럼', color:'#FFD60A'}, news: {label:'📰 뉴스', color:'#34d399'}};
+  var etLabel = isEDT() ? 'EDT' : 'EST';
   el.innerHTML = _scheduleSlots.map(function(s, i) {
-    var h = String(s.hour).padStart(2, '0');
-    var c = CAT[s.category] || {label: s.category, color: '#aaa'};
+    var h   = String(s.hour).padStart(2, '0');
+    var etH = String(kstToEt(s.hour)).padStart(2, '0');
+    var c   = CAT[s.category] || {label: s.category, color: '#aaa'};
     return '<div style="display:flex;align-items:center;justify-content:space-between;'
       + 'padding:7px 10px;background:#ffffff0a;border-radius:8px;margin-bottom:5px">'
-      + '<span style="font-size:14px;font-weight:700;color:#fff;min-width:46px">' + h + ':00</span>'
+      + '<div>'
+      + '<span style="font-size:14px;font-weight:700;color:#fff">' + h + ':00 KST</span>'
+      + '<span style="font-size:11px;color:#555;margin-left:5px">(' + etH + ':00 ' + etLabel + ')</span>'
+      + '</div>'
       + '<span style="font-size:11px;padding:2px 9px;background:' + c.color + '22;color:' + c.color
         + ';border-radius:10px;border:1px solid ' + c.color + '44">' + c.label + '</span>'
       + '<button type="button" onclick="removeScheduleSlot(' + i + ')" '
@@ -694,6 +775,10 @@ async function loadAutoSettings() {
   if (s['upload_schedule_days']) document.getElementById('cfgScheduleDays').value = s['upload_schedule_days'];
   try { _scheduleSlots = JSON.parse(s['upload_schedule_slots'] || '[]'); } catch(e) { _scheduleSlots = []; }
   renderScheduleSlots();
+  // 언어 설정 로드
+  setContentLang(s['content_language'] || 'ko');
+  // 기본값 힌트 (20시)
+  updateEstHint(document.getElementById('newSlotHour') ? document.getElementById('newSlotHour').value : 20);
 }
 
 async function saveAutoSettings() {
@@ -703,7 +788,8 @@ async function saveAutoSettings() {
   var rows = [
     { key: 'upload_schedule_enabled', value: String(schedEnabled) },
     { key: 'upload_schedule_days',    value: schedDays },
-    { key: 'upload_schedule_slots',   value: JSON.stringify(_scheduleSlots) }
+    { key: 'upload_schedule_slots',   value: JSON.stringify(_scheduleSlots) },
+    { key: 'content_language',        value: _contentLang }
   ];
   for (var i = 0; i < rows.length; i++) {
     await sb.from('settings').upsert(rows[i], { onConflict: 'key' });

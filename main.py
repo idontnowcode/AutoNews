@@ -4,7 +4,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from src.topic_manager    import get_next_topic, mark_in_progress, mark_done, mark_pending, mark_failed, save_video
-from src.settings_manager import check_should_run, get_settings
+from src.settings_manager import check_should_run, get_settings, get_content_language
 from src.script_generator import generate_script
 from src.image_generator  import generate_all_images
 from src.tts_generator    import generate_segments_tts
@@ -20,11 +20,14 @@ def main():
         sys.exit(0)
 
     settings = get_settings()
+    language = get_content_language()
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
     os.makedirs('output', exist_ok=True)
     work_dir = f'output/{ts}'
     os.makedirs(work_dir, exist_ok=True)
     topic = None
+    lang_flag = '🇺🇸' if language == 'en' else '🇰🇷'
+    print(f'{lang_flag} 콘텐츠 언어: {language.upper()}')
 
     try:
         # ── 1. 주제 선택 ───────────────────────────────────
@@ -35,7 +38,7 @@ def main():
 
         # ── 2. 스크립트 생성 ───────────────────────────────
         print('✍️  스크립트 생성 중...')
-        script = generate_script(topic)
+        script = generate_script(topic, language=language)
         print(f'   제목: {script["title"]}')
         segments = script['segments']
 
@@ -49,7 +52,7 @@ def main():
         # ── 4. 세그먼트별 TTS 생성 ────────────────────────
         print(f'🎙️  TTS 생성 중... ({len(segments)}개 세그먼트)')
         tts_dir     = os.path.join(work_dir, 'audio')
-        tts_results = generate_segments_tts(segments, tts_dir)
+        tts_results = generate_segments_tts(segments, tts_dir, language=language)
         for seg, tts in zip(segments, tts_results):
             seg['audio_path'] = tts['audio_path']
 
@@ -70,8 +73,11 @@ def main():
                     category   = 'curriculum',
                 )
                 print(f'   📅 예약 발행 설정: {publish_at} (UTC)')
-            video_id = upload_shorts(video_path, script, youtube_title_prefix='[일분 경제] ',
-                                     publish_at=publish_at)
+            title_prefix = '[One Minute Economy] ' if language == 'en' else '[일분 경제] '
+            video_id = upload_shorts(video_path, script,
+                                     youtube_title_prefix=title_prefix,
+                                     publish_at=publish_at,
+                                     language=language)
         except Exception as e:
             err = str(e)
             print(f'❌ 업로드 실패: {err}')
