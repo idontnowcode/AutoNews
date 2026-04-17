@@ -162,13 +162,24 @@ def generate_report(records: list[dict], summary: dict | None = None) -> str:
 
     client = anthropic.Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
 
+    # 프롬프트에 주입할 값 미리 계산
+    r10_avg    = summary.get('recent10_avg', 0)
+    p10_avg    = summary.get('prev10_avg', 0)
+    trend_pct  = summary.get('trend_vs_prev10_pct', 0)
+    trend_sign = '+' if trend_pct >= 0 else ''
+    abs_trend  = abs(trend_pct)
+    all_avg    = summary.get('avg_views', 0)
+    r10_er     = summary.get('recent10_er_avg', 0)
+    p10_er     = summary.get('prev10_er_avg', 0)
+    summary_json = json.dumps(summary, ensure_ascii=False, indent=2)
+
     prompt = f"""당신은 유튜브 채널 데이터 분석 전문가입니다.
 아래는 경제 교육 YouTube Shorts 채널의 **채널 전체 영상** 통계 요약입니다.
 (YouTube 업로드 플레이리스트에서 직접 수집한 실제 데이터입니다.)
 
 ## 통계 요약
 ```json
-{json.dumps(summary, ensure_ascii=False, indent=2)}
+{summary_json}
 ```
 
 ## 참고
@@ -181,10 +192,10 @@ def generate_report(records: list[dict], summary: dict | None = None) -> str:
 - 아래 섹션을 순서대로 포함하세요:
   1. **전체 현황 요약** — 총 영상 수, 평균/최고/최저 조회수, 표준편차로 편차 수준 평가
   2. **최신 10개 트렌드 분석** ← 핵심 섹션
-     - 최신 10개 avg {recent10_avg}회 vs 이전 10개 avg {prev10_avg}회 → {trend_sign}{abs_trend}% 변화
-     - 전체 평균({avg_views}회) 대비 최신 10개 성과 평가
+     - 최신 10개 avg {r10_avg}회 vs 이전 10개 avg {p10_avg}회 → {trend_sign}{abs_trend}% 변화
+     - 전체 평균({all_avg}회) 대비 최신 10개 성과 평가
      - 최신 10개 중 잘된 영상 / 부진 영상 특징
-     - Engagement Rate 변화 (좋아요/조회수): {recent10_er}% vs {prev10_er}%
+     - Engagement Rate 변화 (좋아요/조회수): {r10_er}% vs {p10_er}%
      - **채널이 개선 중인지 하락 중인지 명확히 판단** (숫자 근거 포함)
   3. **조회수 편차 원인 분석** — 카테고리별, 콘텐츠 유형별, 요일/시간대 관점
   4. **상위 5개 영상 특징** — 공통점 및 성공 요인
@@ -192,16 +203,7 @@ def generate_report(records: list[dict], summary: dict | None = None) -> str:
   6. **핵심 개선 제언** — 최신 트렌드를 반영한 우선순위 3가지 (구체적 실행 방법 포함)
 - 모든 수치는 실제 데이터 기반으로 작성
 - 각 섹션 첫 줄에 핵심 인사이트 한 줄 요약 (예: ✅ 개선 중 / ⚠️ 하락세 / ➡️ 보합)
-""".format(
-        recent10_avg=summary.get('recent10_avg', 0),
-        prev10_avg=summary.get('prev10_avg', 0),
-        trend_sign='+' if summary.get('trend_vs_prev10_pct', 0) >= 0 else '',
-        abs_trend=abs(summary.get('trend_vs_prev10_pct', 0)),
-        avg_views=summary.get('avg_views', 0),
-        recent10_er=summary.get('recent10_er_avg', 0),
-        prev10_er=summary.get('prev10_er_avg', 0),
-    )
-
+"""
     message = client.messages.create(
         model='claude-sonnet-4-6',
         max_tokens=8096,
