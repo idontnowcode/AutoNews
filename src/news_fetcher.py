@@ -174,8 +174,19 @@ def get_news_by_id(news_id: str) -> dict | None:
 
 
 def get_next_news() -> dict | None:
-    """관심도 높은 pending 뉴스 1건 반환 (interest_score DESC → published_at DESC)"""
+    """queued 우선, 없으면 pending (interest_score DESC → published_at DESC)"""
     db = get_client()
+    # 1순위: 사용자가 대기열에 추가한 뉴스 (FIFO)
+    res = db.table('news_items') \
+            .select('*') \
+            .eq('status', 'queued') \
+            .order('created_at') \
+            .limit(1) \
+            .execute()
+    if res.data:
+        print(f'   📋 대기 큐에서 선택: {res.data[0]["title"][:40]}')
+        return res.data[0]
+    # 2순위: 자동 선택 (관심도 높은 순)
     res = db.table('news_items') \
             .select('*') \
             .eq('status', 'pending') \
@@ -188,10 +199,20 @@ def get_next_news() -> dict | None:
 
 def get_next_high_interest_news() -> dict | None:
     """
-    예약 발행 모드용: high → medium → 전체 순으로 pending 뉴스 1건 반환.
-    관심도가 높은 뉴스를 최우선 선택.
+    예약 발행 모드용: queued 우선 → high → medium → 전체 순으로 뉴스 1건 반환.
     """
     db = get_client()
+    # 0순위: 사용자 대기 큐 (FIFO)
+    res = db.table('news_items') \
+            .select('*') \
+            .eq('status', 'queued') \
+            .order('created_at') \
+            .limit(1) \
+            .execute()
+    if res.data:
+        print(f'   📋 대기 큐에서 선택: {res.data[0]["title"][:40]}')
+        return res.data[0]
+    # 1~3순위: pending 중 관심도 순
     for level in ('high', 'medium', None):
         q = (db.table('news_items')
                .select('*')
@@ -236,6 +257,10 @@ def mark_news_done(news_id: str, youtube_id: str):
 
 def mark_news_pending(news_id: str):
     get_client().table('news_items').update({'status': 'pending'}).eq('id', news_id).execute()
+
+
+def mark_news_queued(news_id: str):
+    get_client().table('news_items').update({'status': 'queued'}).eq('id', news_id).execute()
 
 
 def mark_news_failed(news_id: str):

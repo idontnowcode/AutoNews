@@ -102,6 +102,19 @@ CREATE INDEX IF NOT EXISTS idx_news_interest ON news_items(interest_score DESC, 
 CREATE INDEX IF NOT EXISTS idx_news_level    ON news_items(interest_level);
 
 -- ============================================================
+-- 뉴스 실행 대기 큐 (queued status)
+-- news_items.status 허용값:
+--   pending    — RSS 수집 후 자동 대기
+--   queued     — 사용자가 수동으로 실행 대기열에 추가 (자동화 최우선 처리)
+--   in_progress — 파이프라인 처리 중
+--   done       — YouTube 업로드 완료
+--   failed     — 처리 실패
+-- status 컬럼은 TEXT 타입이므로 별도 ALTER 불필요
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_news_queued ON news_items(status, created_at)
+  WHERE status = 'queued';
+
+-- ============================================================
 -- 영상 통계 분석 (stats-report)
 -- ============================================================
 
