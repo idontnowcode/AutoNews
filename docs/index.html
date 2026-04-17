@@ -448,6 +448,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
           style="background:#ffffff12;border:1px solid #ffffff25;border-radius:6px;color:#ccc;font-size:11px;padding:4px 8px"
           onchange="loadReport(this.value)">
         </select>
+        <button onclick="triggerStatsReport()" id="reportGenBtn"
+          style="font-size:11px;padding:4px 10px;background:#FFD60A;color:#000;font-weight:700;border-radius:5px;border:none;cursor:pointer">
+          📊 지금 생성
+        </button>
         <button onclick="loadReportList()"
           style="font-size:11px;padding:4px 10px;background:#FFD60A22;border:1px solid #FFD60A55;border-radius:5px;color:#FFD60A;cursor:pointer">
           🔄 새로고침
@@ -1140,6 +1144,26 @@ async function loadNewsSettings() {
 
 // ── 비용 (실제 DB 기반) ───────────────────────────
 // ── 리포트 ────────────────────────────────────────
+async function triggerStatsReport() {
+  if (!cfg.token || !cfg.repo) { toast('⚙️ 설정에서 GitHub Token을 입력하세요'); openModal(); return; }
+  var btn = document.getElementById('reportGenBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '생성 중...'; }
+  var parts = cfg.repo.split('/');
+  var res = await fetch('https://api.github.com/repos/'+parts[0]+'/'+parts[1]+'/actions/workflows/stats_report.yml/dispatches', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer '+cfg.token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ref: 'main' })
+  });
+  if (btn) { btn.disabled = false; btn.textContent = '📊 지금 생성'; }
+  if (res.ok) {
+    toast('📊 리포트 생성 시작 — 2~3분 후 새로고침하세요');
+    // 3분 후 자동 새로고침
+    setTimeout(function() { loadReportList(); }, 180000);
+  } else {
+    toast('GitHub 실행 실패: ' + res.status);
+  }
+}
+
 async function loadReportList() {
   if (!sb) {
     document.getElementById('reportBody').innerHTML = '<div style="color:#fb923c;text-align:center;padding:40px">⚙️ 설정에서 Supabase를 먼저 연결하세요</div>';

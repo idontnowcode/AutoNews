@@ -21,4 +21,5 @@ jobs:
           ANTHROPIC_API_KEY:  ${{ secrets.ANTHROPIC_API_KEY }}
           SUPABASE_URL:       ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY:       ${{ secrets.SUPABASE_KEY }}
+          FORCE_RUN:          ${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}
         run: python stats_report.py

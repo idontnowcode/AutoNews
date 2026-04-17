@@ -95,30 +95,68 @@ def _compute_summary(records: list[dict]) -> dict:
     db_matched   = sum(1 for r in records if r.get('video_type') != 'unknown')
     db_unmatched = total - db_matched
 
+    # ── 최신 10개 vs 이전 10개 트렌드 ──────────────────────────
+    by_date = sorted(
+        [r for r in records if r.get('published_at')],
+        key=lambda x: x['published_at'], reverse=True
+    )
+    recent10 = by_date[:10]
+    prev10   = by_date[10:20]
+
+    r10_views = [r['view_count'] for r in recent10]
+    p10_views = [r['view_count'] for r in prev10]
+    r10_avg   = round(sum(r10_views) / len(r10_views)) if r10_views else 0
+    p10_avg   = round(sum(p10_views) / len(p10_views)) if p10_views else 0
+    trend_pct = round((r10_avg - p10_avg) / p10_avg * 100, 1) if p10_avg else 0
+    trend_vs_all_pct = round((r10_avg - avg_views) / avg_views * 100, 1) if avg_views else 0
+
+    r10_er = [round(r['like_count'] / r['view_count'] * 100, 2)
+              for r in recent10 if r['view_count'] > 0]
+    p10_er = [round(r['like_count'] / r['view_count'] * 100, 2)
+              for r in prev10   if r['view_count'] > 0]
+    r10_er_avg = round(sum(r10_er) / len(r10_er), 2) if r10_er else 0
+    p10_er_avg = round(sum(p10_er) / len(p10_er), 2) if p10_er else 0
+
+    recent10_summary = [
+        {'title': r['title'], 'views': r['view_count'],
+         'likes': r['like_count'], 'type': r.get('video_type', ''),
+         'category': r.get('category', ''), 'published_at': r.get('published_at', '')[:10]}
+        for r in recent10
+    ]
+
     return {
-        'total_videos':  total,
-        'db_matched':    db_matched,
-        'db_unmatched':  db_unmatched,
-        'avg_views':     round(avg_views),
-        'max_views':     max(views),
-        'min_views':     min(views),
-        'std_dev':       round((sum((v - avg_views) ** 2 for v in views) / total) ** 0.5) if total > 1 else 0,
-        'category_avg':  cat_avg,
-        'type_avg':      type_avg,
-        'dow_avg':       dow_avg,
-        'hour_avg':      hour_avg,
-        'top5':          top5,
-        'bottom5':       bottom5,
-        'recent7_avg':   recent_avg,
-        'older_avg':     older_avg,
-        'recent_count':  len(recent),
-        'older_count':   len(older),
+        'total_videos':       total,
+        'db_matched':         db_matched,
+        'db_unmatched':       db_unmatched,
+        'avg_views':          round(avg_views),
+        'max_views':          max(views),
+        'min_views':          min(views),
+        'std_dev':            round((sum((v - avg_views) ** 2 for v in views) / total) ** 0.5) if total > 1 else 0,
+        'category_avg':       cat_avg,
+        'type_avg':           type_avg,
+        'dow_avg':            dow_avg,
+        'hour_avg':           hour_avg,
+        'top5':               top5,
+        'bottom5':            bottom5,
+        'recent7_avg':        recent_avg,
+        'older_avg':          older_avg,
+        'recent_count':       len(recent),
+        'older_count':        len(older),
+        # 최신 10개 트렌드
+        'recent10_videos':    recent10_summary,
+        'recent10_avg':       r10_avg,
+        'prev10_avg':         p10_avg,
+        'trend_vs_prev10_pct': trend_pct,       # 이전 10개 대비 %
+        'trend_vs_all_pct':   trend_vs_all_pct,  # 전체 평균 대비 %
+        'recent10_er_avg':    r10_er_avg,
+        'prev10_er_avg':      p10_er_avg,
     }
 
 
-def generate_report(records: list[dict]) -> str:
+def generate_report(records: list[dict], summary: dict | None = None) -> str:
     """Claude API로 분석 리포트 생성 (마크다운)"""
-    summary = _compute_summary(records)
+    if summary is None:
+        summary = _compute_summary(records)
     if not summary:
         return '# 분석 리포트\n\n분석할 영상 데이터가 없습니다.'
 
@@ -140,16 +178,29 @@ def generate_report(records: list[dict]) -> str:
 
 ## 리포트 작성 지침
 - 마크다운 형식, 한국어 작성
-- 아래 섹션을 포함하세요:
+- 아래 섹션을 순서대로 포함하세요:
   1. **전체 현황 요약** — 총 영상 수, 평균/최고/최저 조회수, 표준편차로 편차 수준 평가
-  2. **조회수 편차 원인 분석** — 카테고리별, 콘텐츠 유형별, 요일/시간대 관점
-  3. **상위 5개 영상 특징** — 공통점 및 성공 요인
-  4. **하위 5개 영상 특징** — 공통점 및 개선 포인트
-  5. **최근 7일 트렌드** — 성장/하락 여부 및 원인 추정
-  6. **핵심 개선 제언** — 우선순위 3가지 (구체적 실행 방법 포함)
+  2. **최신 10개 트렌드 분석** ← 핵심 섹션
+     - 최신 10개 avg {recent10_avg}회 vs 이전 10개 avg {prev10_avg}회 → {trend_sign}{abs_trend}% 변화
+     - 전체 평균({avg_views}회) 대비 최신 10개 성과 평가
+     - 최신 10개 중 잘된 영상 / 부진 영상 특징
+     - Engagement Rate 변화 (좋아요/조회수): {recent10_er}% vs {prev10_er}%
+     - **채널이 개선 중인지 하락 중인지 명확히 판단** (숫자 근거 포함)
+  3. **조회수 편차 원인 분석** — 카테고리별, 콘텐츠 유형별, 요일/시간대 관점
+  4. **상위 5개 영상 특징** — 공통점 및 성공 요인
+  5. **하위 5개 영상 특징** — 공통점 및 개선 포인트
+  6. **핵심 개선 제언** — 최신 트렌드를 반영한 우선순위 3가지 (구체적 실행 방법 포함)
 - 모든 수치는 실제 데이터 기반으로 작성
-- 각 섹션 첫 줄에 핵심 인사이트 한 줄 요약
-"""
+- 각 섹션 첫 줄에 핵심 인사이트 한 줄 요약 (예: ✅ 개선 중 / ⚠️ 하락세 / ➡️ 보합)
+""".format(
+        recent10_avg=summary.get('recent10_avg', 0),
+        prev10_avg=summary.get('prev10_avg', 0),
+        trend_sign='+' if summary.get('trend_vs_prev10_pct', 0) >= 0 else '',
+        abs_trend=abs(summary.get('trend_vs_prev10_pct', 0)),
+        avg_views=summary.get('avg_views', 0),
+        recent10_er=summary.get('recent10_er_avg', 0),
+        prev10_er=summary.get('prev10_er_avg', 0),
+    )
 
     message = client.messages.create(
         model='claude-sonnet-4-6',
@@ -176,7 +227,7 @@ def run_analysis(records: list[dict]) -> str:
     print('🤖 Claude 분석 리포트 생성 중...')
     summary = _compute_summary(records)
     try:
-        report_md = generate_report(records)
+        report_md = generate_report(records, summary)
     except Exception as e:
         err = str(e)
         if 'usage' in err.lower() or '400' in err or 'limit' in err.lower():
