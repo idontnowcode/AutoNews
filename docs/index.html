@@ -137,15 +137,18 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 <!-- 헤더 -->
 <div class="header">
   <div>
-    <div style="display:flex;align-items:baseline;gap:7px">
-      <div class="header-title">일분 스튜디오</div>
-      <span id="langHeaderBadge" style="font-size:11px;color:#888"></span>
-    </div>
+    <div class="header-title">일분 스튜디오</div>
     <div id="headerSub" style="font-size:11px;color:#666;margin-top:1px">연결 대기 중...</div>
     <div id="dualClock" style="font-size:11px;color:#555;margin-top:2px;letter-spacing:.2px"></div>
   </div>
-  <div style="display:flex;align-items:center;gap:10px">
+  <div style="display:flex;align-items:center;gap:8px">
     <span id="schedHeaderBadge" style="font-size:11px;color:#555"></span>
+    <div style="display:flex;gap:4px">
+      <button id="langBtnKo" onclick="setContentLang('ko')"
+        style="font-size:12px;padding:4px 11px;border-radius:20px;border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;font-weight:700;cursor:pointer;transition:all .15s">🇰🇷</button>
+      <button id="langBtnEn" onclick="setContentLang('en')"
+        style="font-size:12px;padding:4px 11px;border-radius:20px;border:1px solid #ffffff20;background:transparent;color:#555;font-weight:700;cursor:pointer;transition:all .15s">🇺🇸</button>
+    </div>
     <button class="btn-gear" onclick="openModal()">⚙️</button>
   </div>
 </div>
@@ -498,19 +501,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
       <input id="cfgRepo" class="form-input" type="text" placeholder="username/repo">
     </div>
 
-    <!-- 콘텐츠 언어 설정 -->
-    <div style="border-top:1px solid #ffffff15;margin:16px 0 14px"></div>
-    <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">🌐 콘텐츠 언어</div>
-    <div class="form-group">
-      <div style="display:flex;gap:8px">
-        <button type="button" id="langBtnKo" onclick="setContentLang('ko')"
-          style="flex:1;padding:10px;border-radius:8px;border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;font-size:13px;font-weight:700;cursor:pointer">🇰🇷 한국어</button>
-        <button type="button" id="langBtnEn" onclick="setContentLang('en')"
-          style="flex:1;padding:10px;border-radius:8px;border:1px solid #ffffff25;background:transparent;color:#888;font-size:13px;font-weight:700;cursor:pointer">🇺🇸 English</button>
-      </div>
-      <div id="langHint" style="font-size:11px;color:#555;margin-top:6px">한국어 Shorts 생성 · 국내 채널(YOUTUBE_TOKEN)에 업로드</div>
-    </div>
-
     <!-- 예약 발행 설정 구분선 -->
     <div style="border-top:1px solid #ffffff15;margin:16px 0 14px"></div>
     <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">📅 예약 발행</div>
@@ -620,23 +610,28 @@ function updateEstHint(val) {
 
 // ── 콘텐츠 언어 ───────────────────────────────────
 var _contentLang = 'ko';
-function setContentLang(lang) {
+var _langSaveTimer = null;
+function setContentLang(lang, skipSave) {
   _contentLang = lang;
-  var ko   = document.getElementById('langBtnKo');
-  var en   = document.getElementById('langBtnEn');
-  var hint = document.getElementById('langHint');
-  var badge = document.getElementById('langHeaderBadge');
+  var ko = document.getElementById('langBtnKo');
+  var en = document.getElementById('langBtnEn');
   if (!ko || !en) return;
+  var base = 'font-size:12px;padding:4px 11px;border-radius:20px;font-weight:700;cursor:pointer;transition:all .15s;';
   if (lang === 'ko') {
-    ko.style.cssText = 'flex:1;padding:10px;border-radius:8px;border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;font-size:13px;font-weight:700;cursor:pointer';
-    en.style.cssText = 'flex:1;padding:10px;border-radius:8px;border:1px solid #ffffff25;background:transparent;color:#888;font-size:13px;font-weight:700;cursor:pointer';
-    if (hint)  hint.textContent  = '한국어 Shorts 생성 · 국내 채널(YOUTUBE_TOKEN)에 업로드';
-    if (badge) { badge.textContent = '🇰🇷'; badge.style.color = '#FFD60A'; }
+    ko.style.cssText = base + 'border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;';
+    en.style.cssText = base + 'border:1px solid #ffffff20;background:transparent;color:#555;';
   } else {
-    en.style.cssText = 'flex:1;padding:10px;border-radius:8px;border:1px solid #4f9eff55;background:#4f9eff22;color:#4f9eff;font-size:13px;font-weight:700;cursor:pointer';
-    ko.style.cssText = 'flex:1;padding:10px;border-radius:8px;border:1px solid #ffffff25;background:transparent;color:#888;font-size:13px;font-weight:700;cursor:pointer';
-    if (hint)  hint.textContent  = 'English Shorts 생성 · 해외 채널(YOUTUBE_TOKEN_EN)에 업로드';
-    if (badge) { badge.textContent = '🇺🇸'; badge.style.color = '#4f9eff'; }
+    en.style.cssText = base + 'border:1px solid #4f9eff55;background:#4f9eff22;color:#4f9eff;';
+    ko.style.cssText = base + 'border:1px solid #ffffff20;background:transparent;color:#555;';
+  }
+  // Supabase에 자동 저장 (debounce 500ms)
+  if (!skipSave && sb) {
+    clearTimeout(_langSaveTimer);
+    _langSaveTimer = setTimeout(function() {
+      sb.from('settings').upsert({key:'content_language', value:lang}, {onConflict:'key'}).then(function(){
+        toast(lang === 'ko' ? '🇰🇷 한국어 모드로 변경됨' : '🇺🇸 English mode activated');
+      });
+    }, 500);
   }
 }
 
@@ -775,8 +770,8 @@ async function loadAutoSettings() {
   if (s['upload_schedule_days']) document.getElementById('cfgScheduleDays').value = s['upload_schedule_days'];
   try { _scheduleSlots = JSON.parse(s['upload_schedule_slots'] || '[]'); } catch(e) { _scheduleSlots = []; }
   renderScheduleSlots();
-  // 언어 설정 로드
-  setContentLang(s['content_language'] || 'ko');
+  // 언어 설정 로드 (저장 없이 UI만 반영)
+  setContentLang(s['content_language'] || 'ko', true);
   // 기본값 힌트 (20시)
   updateEstHint(document.getElementById('newSlotHour') ? document.getElementById('newSlotHour').value : 20);
 }
@@ -788,8 +783,7 @@ async function saveAutoSettings() {
   var rows = [
     { key: 'upload_schedule_enabled', value: String(schedEnabled) },
     { key: 'upload_schedule_days',    value: schedDays },
-    { key: 'upload_schedule_slots',   value: JSON.stringify(_scheduleSlots) },
-    { key: 'content_language',        value: _contentLang }
+    { key: 'upload_schedule_slots',   value: JSON.stringify(_scheduleSlots) }
   ];
   for (var i = 0; i < rows.length; i++) {
     await sb.from('settings').upsert(rows[i], { onConflict: 'key' });
