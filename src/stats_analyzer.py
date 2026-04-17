@@ -175,7 +175,15 @@ def run_analysis(records: list[dict]) -> str:
     """전체 분석 파이프라인: 요약 계산 → Claude 리포트 → DB 저장"""
     print('🤖 Claude 분석 리포트 생성 중...')
     summary = _compute_summary(records)
-    report_md = generate_report(records)
+    try:
+        report_md = generate_report(records)
+    except Exception as e:
+        err = str(e)
+        if 'usage' in err.lower() or '400' in err or 'limit' in err.lower():
+            print(f'⚠️  Claude API 한도 초과 — 통계 수집만 저장합니다: {err}')
+            report_md = f'# 통계 수집 완료 (리포트 생성 불가)\n\nClaude API 사용 한도 초과로 분석 리포트를 생성하지 못했습니다.\n\n> {err}'
+        else:
+            raise
 
     report_id = save_report(report_md, summary)
     print(f'   리포트 저장 완료 (id: {report_id})')
