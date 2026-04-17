@@ -177,7 +177,7 @@ def generate_news_script(news_item: dict) -> dict:
         image_rule = IMAGE_RULE_DEFAULT
 
     # ── 1단계: 스크립트 초안 생성 ─────────────────────
-    msg = client.messages.create(
+    msg = _get_client().messages.create(
         model='claude-sonnet-4-6',
         max_tokens=2048,
         messages=[{
