@@ -92,6 +92,13 @@ def main():
     except SystemExit:
         raise
     except Exception as e:
+        err = str(e)
+        if 'usage' in err.lower() and ('limit' in err.lower() or '400' in err):
+            print(f'⏸️  Anthropic API 한도 초과 — 주제를 pending 상태로 되돌립니다.')
+            print(f'   복구 예정: {err}')
+            if topic:
+                mark_pending(topic['id'])  # failed 대신 pending으로 복귀
+            sys.exit(0)
         print(f'❌ 파이프라인 오류: {e}')
         if topic:
             mark_failed(topic['id'])
