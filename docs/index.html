@@ -342,6 +342,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
       </div>
     </div>
 
+    <!-- 진행중 리스트 -->
+    <div id="inProgressSection" style="margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;color:#fb923c;margin-bottom:6px;display:flex;align-items:center;gap:6px">
+        ⚙️ 진행중 리스트
+        <span style="font-size:10px;color:#666;font-weight:400">— 현재 영상 생성 중인 뉴스</span>
+      </div>
+      <div class="card" id="inProgressContainer" style="border:1px solid #fb923c30;background:#fb923c06">
+        <div style="color:#444;font-size:12px;text-align:center;padding:14px">진행중인 뉴스 없음</div>
+      </div>
+    </div>
+
     <!-- 수집 리스트 -->
     <div style="font-size:11px;font-weight:700;color:#888;margin-bottom:6px">📰 수집 리스트</div>
     <div class="card" id="newsContainer">
@@ -588,6 +599,7 @@ function connect() {
       loadAutoSettingsForHeader();
       loadNews('all');
       loadQueuedNews();
+      loadInProgressNews();
       loadNewsSettings();
     } catch(e) {
       toast('연결 오류: ' + e.message);
@@ -740,7 +752,7 @@ function showTab(n) {
     document.getElementById('tabPane' + i).style.display = i === n ? 'block' : 'none';
     document.getElementById('tabBtn' + i).className = 'tab-btn' + (i === n ? ' active' : '');
   }
-  if (n === 3) { loadNews('all'); loadQueuedNews(); }
+  if (n === 3) { loadNews('all'); loadQueuedNews(); loadInProgressNews(); }
   if (n === 4) loadCostStats();
   if (n === 5) loadReportList();
   try { localStorage.setItem('ibbun_tab', n); } catch(e) {}
@@ -819,7 +831,7 @@ async function loadNews(filter) {
                 .order('published_at',   {ascending: false})
                 .limit(100);
   if (_newsFilter !== 'all')         query = query.eq('status',   _newsFilter);
-  else                               query = query.neq('status', 'queued');  // 대기 큐는 별도 섹션
+  else                               query = query.not('status', 'in', '("queued","in_progress")');  // 별도 섹션
   if (_newsCatFilter !== 'all')      query = query.eq('category', _newsCatFilter);
   if (_newsInterestFilter !== 'all') query = query.eq('interest_level', _newsInterestFilter);
 
@@ -876,6 +888,36 @@ async function loadNews(filter) {
   el.innerHTML = html;
 }
 
+async function loadInProgressNews() {
+  if (!sb) return;
+  var el = document.getElementById('inProgressContainer');
+  if (!el) return;
+  var res = await sb.from('news_items')
+    .select('id,title,source,interest_level,created_at')
+    .eq('status', 'in_progress')
+    .order('created_at', {ascending: false});
+  var items = (res.data || []);
+  if (!items.length) {
+    el.innerHTML = '<div style="color:#444;font-size:12px;text-align:center;padding:14px">진행중인 뉴스 없음</div>';
+    return;
+  }
+  var html = '';
+  items.forEach(function(item) {
+    var intLvl = item.interest_level || 'medium';
+    var intBadge = intLvl === 'high' ? '🔥' : intLvl === 'medium' ? '⚡' : '·';
+    html += '<div style="padding:10px 14px;border-bottom:1px solid #fb923c15;display:flex;align-items:center;gap:10px">';
+    html += '<div style="flex:1;min-width:0">';
+    html += '<div style="font-size:13px;font-weight:500;line-height:1.4">' + intBadge + ' ' + item.title + '</div>';
+    html += '<div style="font-size:11px;color:#666;margin-top:2px">' + (item.source||'') + '</div>';
+    html += '</div>';
+    html += '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">';
+    html += '<span style="font-size:10px;color:#fb923c;animation:pulse 1.5s infinite">● 생성중</span>';
+    html += '<button onclick="resetNews(\''+item.id+'\')" style="font-size:10px;padding:3px 9px;background:#fb923c22;border:1px solid #fb923c55;border-radius:5px;color:#fb923c;cursor:pointer">🔄 초기화</button>';
+    html += '</div></div>';
+  });
+  el.innerHTML = html;
+}
+
 async function loadQueuedNews() {
   if (!sb) return;
   var el = document.getElementById('queuedContainer');
@@ -927,7 +969,11 @@ async function unqueueNews(id) {
 async function runQueuedNews(id) {
   if (!cfg.token || !cfg.repo) { toast('⚙️ 설정에서 GitHub Token을 입력하세요'); openModal(); return; }
   var ok = await triggerNewsActions(id);
-  if (ok) toast('⚡ 선택한 뉴스 생성 시작 (즉시 공개)');
+  if (ok) {
+    toast('⚡ 선택한 뉴스 생성 시작 (즉시 공개)');
+    // 잠시 후 진행중 리스트 갱신 (워크플로우가 in_progress로 변경하는 시간 고려)
+    setTimeout(function() { loadQueuedNews(); loadInProgressNews(); }, 3000);
+  }
 }
 
 async function reserveNews(id) {
@@ -952,6 +998,7 @@ async function resetNews(id) {
   if (!sb) return;
   await sb.from('news_items').update({ status: 'pending' }).eq('id', id);
   toast('🔄 대기 상태로 초기화됨');
+  loadInProgressNews();
   loadNews(_newsFilter);
 }
 
