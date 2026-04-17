@@ -35,6 +35,20 @@ jobs:
       - name: Python 패키지 설치
         run: pip install --no-cache-dir -r requirements.txt
 
+      - name: 아웃트로 asset 캐시 복원
+        id: cache-outro
+        uses: actions/cache@v4
+        with:
+          path: assets/
+          key: outro-assets-v1
+
+      - name: 아웃트로 asset 생성 (캐시 없을 때)
+        if: steps.cache-outro.outputs.cache-hit != 'true'
+        env:
+          OPENAI_API_KEY:     ${{ secrets.OPENAI_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+        run: python tools/generate_outro_assets.py
+
       - name: 파이프라인 실행
         env:
           ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}

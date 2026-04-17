@@ -3,12 +3,17 @@
 커리큘럼용 script_generator.py와 별도 — 뉴스 요약 특화
 """
 import os
-import json
 import re
 import anthropic
-from src.script_generator import fix_title_grammar
+from src.script_generator import fix_title_grammar, extract_json, append_outro
 
-client = anthropic.Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
+_client = None
+
+def _get_client() -> anthropic.Anthropic:
+    global _client
+    if _client is None:
+        _client = anthropic.Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
+    return _client
 
 NEWS_PROMPT = '''
 당신은 뉴스 YouTube Shorts 채널의 콘텐츠 제작자입니다.
@@ -24,11 +29,15 @@ NEWS_PROMPT = '''
 - 세그먼트 수: 6~8개
 - ★ 각 세그먼트 나레이션은 반드시 20~40자 이내 ★
 - 뉴스 내용을 이해하기 쉽게 요약 (전문용어 최소화)
+- ★ 말투: 친구에게 이야기하듯 자연스러운 구어체 ★
+    좋은 예시: 이거 진짜 큰일 났어요 / 그래서 어떻게 됐냐면요 / 쉽게 말하면요
+    나쁜 예시: 발표했습니다 / 밝혔습니다 / 시행될 예정입니다 (뉴스 리딩체 금지)
+    → ~했어요, ~거든요, ~는데요, ~인 거예요 등 구어 표현 사용
 - 세그먼트 구성:
-    0: 헤드라인 한 줄 요약 (시청자 관심 유발)
-    1: 무슨 일이 일어났나?
-    2~5: 핵심 내용 / 배경 / 숫자/데이터
-    마지막: 영향 또는 전망
+    0: 헤드라인 한 줄 요약 (시청자 관심 유발 — 반드시 구어체)
+    1: 무슨 일이 일어났나? (쉽고 친근하게)
+    2~5: 핵심 내용 / 배경 / 숫자/데이터 (대화하듯)
+    마지막: 영향 또는 전망 (짧고 임팩트 있게)
 
 [이미지 프롬프트 규칙 — 영어로만]
 - 반드시 영어로 작성 (한글/한자 절대 금지)
@@ -101,7 +110,7 @@ def _fact_check_script(news_item: dict, script: dict) -> dict:
     )
 
     try:
-        msg = client.messages.create(
+        msg = _get_client().messages.create(
             model='claude-sonnet-4-6',
             max_tokens=2048,
             tools=[{'type': 'web_search_20250305', 'name': 'web_search'}],
@@ -114,14 +123,11 @@ def _fact_check_script(news_item: dict, script: dict) -> dict:
             if hasattr(block, 'text'):
                 raw += block.text
 
-        raw = raw.strip()
-        raw = re.sub(r'```[a-z]*', '', raw).strip('`').strip()
-        match = re.search(r'\{.*\}', raw, re.DOTALL)
-        if not match:
+        try:
+            fc = extract_json(raw.strip())
+        except (ValueError, Exception):
             print('   ⚠️  팩트체크 JSON 파싱 실패 — 원본 유지')
             return script
-
-        fc = json.loads(match.group())
         corrections = fc.get('corrections', [])
         if corrections:
             print(f'   🔍 팩트체크 수정사항: {corrections}')
@@ -185,12 +191,7 @@ def generate_news_script(news_item: dict) -> dict:
             )
         }]
     )
-    raw = msg.content[0].text.strip()
-    raw = re.sub(r'```[a-z]*', '', raw).strip('`').strip()
-    match = re.search(r'\{.*\}', raw, re.DOTALL)
-    if not match:
-        raise ValueError('JSON 블록을 찾을 수 없음')
-    result = json.loads(match.group())
+    result = extract_json(msg.content[0].text.strip())
 
     # 제목 후처리 (이란/란 문법 교정 — 해당하는 경우)
     if 'title' in result and ('이란?' in result['title'] or '란?' in result['title']):
@@ -199,5 +200,8 @@ def generate_news_script(news_item: dict) -> dict:
     # ── 2단계: 웹 검색 팩트체크 ──────────────────────
     print('   🔍 웹 검색 팩트체크 중...')
     result = _fact_check_script(news_item, result)
+
+    # ── 3단계: 구독/좋아요 유도 아웃트로 추가 ────────
+    result['segments'] = append_outro(result.get('segments', []))
 
     return result

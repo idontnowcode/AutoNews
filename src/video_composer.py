@@ -25,7 +25,11 @@ TITLE_TOP    = 120
 IMG_Y        = 360
 IMG_SIZE     = 1080
 
-TYPING_SPEED = 8    # 초당 타이핑 글자 수 (음성과 함께 읽기 좋은 속도)
+SUB_BG_ALPHA  = 160  # 자막 배경 박스 투명도 (0=완전투명, 255=불투명)
+SUB_BG_PAD    = 18   # 자막 배경 박스 여백(px)
+# YouTube Shorts 우측 버튼(좋아요/댓글/공유) 영역 약 130px 차지
+# 좌우 각 120px 여백을 두어 자막이 버튼에 가리지 않도록 제한
+SUB_MAX_WIDTH = W - 240  # 1080 - 240 = 840px
 
 
 def _get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
@@ -138,29 +142,51 @@ def _make_base(title: str, image_path: str) -> tuple:
 def _draw_subtitle(base_img: Image.Image, text: str,
                    sub_font, line_h: int, sub_top: int,
                    sub_bottom: int, pad: int) -> np.ndarray:
-    """베이스 이미지에 자막 text를 그린 numpy 배열 반환"""
+    """베이스 이미지에 자막 text를 그린 numpy 배열 반환 (정적 프레임 / make_frame 용)."""
     img  = base_img.copy()
     draw = ImageDraw.Draw(img)
 
     if text:
-        lines   = _wrap_text(draw, text, sub_font, W - pad * 2)[:3]
+        lines   = _wrap_text(draw, text, sub_font, SUB_MAX_WIDTH)[:3]
         total_h = line_h * len(lines)
-        y       = max(sub_top, sub_bottom - total_h)
+        y_start = max(sub_top, sub_bottom - total_h)
+
+        max_line_w = max(draw.textlength(ln, font=sub_font) for ln in lines)
+        box_w = int(max_line_w) + SUB_BG_PAD * 2
+        box_h = total_h + SUB_BG_PAD * 2
+        box_x = (W - box_w) // 2
+        box_y = y_start - SUB_BG_PAD
+
+        overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+        ov_draw = ImageDraw.Draw(overlay)
+        ov_draw.rounded_rectangle(
+            [(box_x, box_y), (box_x + box_w, box_y + box_h)],
+            radius=12, fill=(0, 0, 0, SUB_BG_ALPHA),
+        )
+        img  = Image.alpha_composite(img.convert('RGBA'), overlay).convert('RGB')
+        draw = ImageDraw.Draw(img)
+
+        y = y_start
         for line in lines:
-            draw.text((pad, y), line, font=sub_font, fill=C_WHITE)  # 왼쪽 정렬
+            lw = draw.textlength(line, font=sub_font)
+            draw.text(((W - lw) // 2, y), line, font=sub_font, fill=C_WHITE)
             y += line_h
 
     return np.array(img)
 
 
+TYPING_SPEED = 8    # 초당 타이핑 글자 수
+
+
 # ── 타이핑 효과 클립 생성 ─────────────────────────────────────────
 
-def _make_typing_clip(title: str, image_path: str,
-                      narration: str, audio_path: str):
+def _make_subtitle_clip(title: str, image_path: str,
+                        narration: str, audio_path: str):
     """
     자막이 한 글자씩 타이핑되는 VideoClip 반환.
-    - TYPING_SPEED 글자/초로 타이핑 → 이후 전체 자막 유지
-    - 베이스 프레임은 1회만 렌더링, 자막 상태별 numpy 배열 캐싱
+
+    핵심: 배경 박스 위치·크기와 텍스트 Y를 전체 나레이션 기준으로 미리 고정.
+    타이핑 중 박스가 늘어나거나 위치가 바뀌지 않는다.
     """
     base_img, sub_font, line_h, sub_top, sub_bottom, pad = _make_base(title, image_path)
     audio        = AudioFileClip(audio_path)
@@ -168,13 +194,46 @@ def _make_typing_clip(title: str, image_path: str,
     total_chars  = len(narration)
     total_frames = max(1, int(duration * FPS))
 
-    # 자막 상태(글자 수) → numpy 배열 캐시
+    # ── 전체 나레이션 기준으로 레이아웃 고정 ──────────────────────
+    _ref_draw   = ImageDraw.Draw(base_img.copy())
+    full_lines  = _wrap_text(_ref_draw, narration, sub_font, SUB_MAX_WIDTH)[:3]
+    full_n_lines = len(full_lines)
+    full_max_w   = max((_ref_draw.textlength(ln, font=sub_font) for ln in full_lines),
+                       default=0)
+
+    y_fixed   = max(sub_top, sub_bottom - line_h * full_n_lines)
+    box_w     = int(full_max_w) + SUB_BG_PAD * 2
+    box_h     = line_h * full_n_lines + SUB_BG_PAD * 2
+    box_x     = (W - box_w) // 2
+    box_y     = y_fixed - SUB_BG_PAD
+
+    # 배경 박스가 그려진 베이스 이미지 1회만 합성
+    overlay = Image.new('RGBA', base_img.size, (0, 0, 0, 0))
+    ov_draw = ImageDraw.Draw(overlay)
+    ov_draw.rounded_rectangle(
+        [(box_x, box_y), (box_x + box_w, box_y + box_h)],
+        radius=12,
+        fill=(0, 0, 0, SUB_BG_ALPHA),
+    )
+    base_with_box = Image.alpha_composite(
+        base_img.convert('RGBA'), overlay
+    ).convert('RGB')
+
+    # ── 자막 상태(글자 수) → numpy 배열 캐시 ───────────────────────
     _cache: dict[int, np.ndarray] = {}
 
     def get_arr(n: int) -> np.ndarray:
         if n not in _cache:
-            _cache[n] = _draw_subtitle(base_img, narration[:n],
-                                       sub_font, line_h, sub_top, sub_bottom, pad)
+            img  = base_with_box.copy()
+            draw = ImageDraw.Draw(img)
+            if n:
+                lines = _wrap_text(draw, narration[:n], sub_font, SUB_MAX_WIDTH)[:3]
+                y = y_fixed
+                for line in lines:
+                    lw = draw.textlength(line, font=sub_font)
+                    draw.text(((W - lw) // 2, y), line, font=sub_font, fill=C_WHITE)
+                    y += line_h
+            _cache[n] = np.array(img)
         return _cache[n]
 
     # 타이핑 완료 시점: 전체 길이의 최대 50% 또는 타이핑 소요 시간
@@ -183,14 +242,10 @@ def _make_typing_clip(title: str, image_path: str,
     frames = []
     for i in range(total_frames):
         t = i / FPS
-        if t >= typing_end:
-            n = total_chars
-        else:
-            n = min(int(t * TYPING_SPEED) + 1, total_chars)
+        n = total_chars if t >= typing_end else min(int(t * TYPING_SPEED) + 1, total_chars)
         frames.append(get_arr(n))
 
     clip = ImageSequenceClip(frames, fps=FPS)
-
     if MOVIEPY_V2:
         clip = clip.with_audio(audio)
     else:
@@ -219,7 +274,7 @@ def compose_video(segments_data: list, title: str, output_path: str) -> str:
     """
     clips = []
     for seg in segments_data:
-        clip = _make_typing_clip(
+        clip = _make_subtitle_clip(
             title      = title,
             image_path = seg.get('image_path', ''),
             narration  = seg['narration'],

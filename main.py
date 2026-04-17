@@ -54,7 +54,8 @@ def main():
             seg['audio_path'] = tts['audio_path']
 
         # ── 5. 영상 합성 ───────────────────────────────────
-        print('🎬 영상 합성 중...')
+        seg_preview = " / ".join(s["narration"][:8] for s in segments)
+        print(f'🎬 영상 합성 중... (총 {len(segments)}개 세그먼트: {seg_preview})')
         video_path = os.path.join(work_dir, 'video.mp4')
         compose_video(segments, script['title'], video_path)
 

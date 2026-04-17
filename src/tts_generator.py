@@ -23,6 +23,12 @@ def generate_tts(text: str, output_path: str,
         }
     }
     resp = requests.post(url, json=payload, headers=headers, timeout=30)
+    if resp.status_code == 401:
+        raise RuntimeError(
+            'ElevenLabs 인증 실패 (401). '
+            'GitHub Secrets의 ELEVENLABS_API_KEY를 확인/재발급하세요. '
+            '발급: https://elevenlabs.io → Profile → API Keys'
+        )
     resp.raise_for_status()
     with open(output_path, 'wb') as f:
         f.write(resp.content)
@@ -30,13 +36,22 @@ def generate_tts(text: str, output_path: str,
 
 
 def generate_segments_tts(segments: list, out_dir: str) -> list:
-    """세그먼트별 TTS 생성 → [(audio_path, narration), ...] 반환"""
+    """세그먼트별 TTS 생성 → [(audio_path, narration), ...] 반환.
+    세그먼트에 audio_path 가 이미 설정돼 있으면 해당 파일을 그대로 사용 (고정 asset 재사용).
+    """
     os.makedirs(out_dir, exist_ok=True)
     results = []
     for seg in segments:
         idx       = seg['index']
         narration = seg['narration']
-        path      = os.path.join(out_dir, f'audio_{idx:02d}.mp3')
+
+        # 이미 경로가 주입된 고정 asset → TTS 생성 건너뜀
+        if seg.get('audio_path') and os.path.exists(seg['audio_path']):
+            print(f'   TTS 스킵 [{idx}]: 고정 asset 사용')
+            results.append({'audio_path': seg['audio_path'], 'narration': narration, 'index': idx})
+            continue
+
+        path = os.path.join(out_dir, f'audio_{idx:02d}.mp3')
         print(f'   TTS [{idx+1}/{len(segments)}]: {narration[:30]}...')
         generate_tts(narration, path)
         results.append({'audio_path': path, 'narration': narration, 'index': idx})

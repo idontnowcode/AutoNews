@@ -10,7 +10,8 @@ from dotenv import load_dotenv
 from src.news_fetcher        import (fetch_rss_items, save_new_items, get_next_news,
                                       get_next_high_interest_news, refresh_and_fetch_news,
                                       mark_news_in_progress, mark_news_done, mark_news_pending,
-                                      mark_news_failed, delete_old_news, get_news_settings)
+                                      mark_news_failed, delete_old_news, get_news_settings,
+                                      get_news_by_id)
 from src.news_script_generator import generate_news_script
 from src.image_generator      import generate_all_images
 from src.tts_generator        import generate_segments_tts
@@ -35,8 +36,14 @@ def main():
     max_per_feed  = int(news_settings.get('news_max_per_feed', 5))
     schedule_on   = settings.get('upload_schedule_enabled', 'false').lower() == 'true'
 
+    # NEWS_ID 지정 여부를 먼저 확인 — 있으면 RSS 수집/삭제 전체 건너뜀
+    news_id_override = os.environ.get('NEWS_ID', '').strip()
+
     # ── 1. RSS 수집 + 관심도 채점 + DB 저장 ──────────
-    if schedule_on:
+    if news_id_override:
+        # 특정 뉴스 직접 지정 시: pending 삭제나 RSS 재수집 없이 바로 진행
+        print(f'📌 특정 뉴스 ID 지정 — RSS 수집 건너뜁니다 ({news_id_override})')
+    elif schedule_on:
         # 예약 발행 모드: pending 뉴스 전체 삭제 후 최신 뉴스 재수집
         print('🔄 예약 발행 모드: 최신 뉴스 실시간 수집 중...')
         refresh_and_fetch_news(max_per_feed=max_per_feed)
@@ -57,10 +64,17 @@ def main():
 
     try:
         # ── 2. 다음 처리할 뉴스 선택 ──────────────────────
-        if schedule_on:
-            news = get_next_high_interest_news()  # high → medium → any 우선순위
-        else:
-            news = get_next_news()
+        if news_id_override:
+            news = get_news_by_id(news_id_override)
+            if news:
+                print(f'📌 지정된 뉴스: {news["title"]}')
+            else:
+                print(f'⚠️  지정된 뉴스 ID를 찾을 수 없음: {news_id_override} — 자동 선택으로 전환')
+        if not news:
+            if schedule_on:
+                news = get_next_high_interest_news()  # high → medium → any 우선순위
+            else:
+                news = get_next_news()
         if not news:
             print('📭 처리할 뉴스가 없습니다. 내일 다시 시도합니다.')
             sys.exit(0)
@@ -89,7 +103,8 @@ def main():
             seg['audio_path'] = tts['audio_path']
 
         # ── 6. 영상 합성 ──────────────────────────────────
-        print('🎬 영상 합성 중...')
+        seg_preview = " / ".join(s["narration"][:8] for s in segments)
+        print(f'🎬 영상 합성 중... (총 {len(segments)}개 세그먼트: {seg_preview})')
         video_path = os.path.join(work_dir, 'video.mp4')
         compose_video(segments, script['title'], video_path)
 
@@ -97,7 +112,10 @@ def main():
         print('📤 YouTube 업로드 중...')
         try:
             publish_at = None
-            if settings.get('upload_schedule_enabled', 'false').lower() == 'true':
+            if news_id_override:
+                # 수동 진행 버튼 → 예약 없이 즉시 공개
+                print('   ⚡ 수동 실행 — 즉시 공개 업로드')
+            elif settings.get('upload_schedule_enabled', 'false').lower() == 'true':
                 publish_at = get_next_optimal_time(
                     days_str   = settings.get('upload_schedule_days', 'everyday'),
                     slots_json = settings.get('upload_schedule_slots', '[]'),

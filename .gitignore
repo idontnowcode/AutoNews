@@ -10,6 +10,11 @@ client_secrets.json
 # 출력 파일 (임시)
 output/
 
+# 아웃트로 고정 asset (로컬 생성, git 미추적)
+assets/*.png
+assets/*.mp3
+!assets/.gitkeep
+
 # Python
 __pycache__/
 *.py[cod]

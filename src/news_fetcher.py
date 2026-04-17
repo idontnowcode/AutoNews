@@ -97,6 +97,16 @@ def fetch_rss_items(max_per_feed: int = DEFAULT_MAX_PER_FEED,
     return items
 
 
+def _jaccard_title(a: str, b: str) -> float:
+    """두 제목의 Jaccard 유사도 (2글자 이상 단어 기준)"""
+    import re
+    tokenize = lambda s: set(w for w in re.split(r'[\s\-·|,]+', s) if len(w) >= 2)
+    sa, sb = tokenize(a), tokenize(b)
+    if not sa or not sb:
+        return 0.0
+    return len(sa & sb) / len(sa | sb)
+
+
 def save_new_items(items: list[dict]) -> int:
     """중복 제외하고 신규 뉴스만 DB에 저장 (관심도 채점 포함)"""
     from src.news_scorer import score_items, print_score_summary
@@ -114,12 +124,29 @@ def save_new_items(items: list[dict]) -> int:
         print(f'   🔽 낮음 관심도 제외: {before - len(scored)}건 스킵 → {len(scored)}건 저장 대상')
 
     db = get_client()
+
+    # 최근 48시간 내 DB 제목 로드 (제목 유사도 중복 체크용)
+    cutoff_48h = (datetime.now(timezone.utc) - timedelta(hours=48)).isoformat()
+    existing_titles_res = db.table('news_items').select('title') \
+        .gte('created_at', cutoff_48h).execute()
+    known_titles: list[str] = [r['title'] for r in (existing_titles_res.data or [])]
+
     saved = 0
+    dup_skipped = 0
     for item in scored:
         try:
-            existing = db.table('news_items').select('id').eq('url', item['url']).execute()
-            if existing.data:
+            # 1) URL 중복 체크
+            if db.table('news_items').select('id').eq('url', item['url']).execute().data:
                 continue
+
+            # 2) 제목 유사도 중복 체크 (Jaccard >= 0.40)
+            is_title_dup = any(
+                _jaccard_title(item['title'], t) >= 0.40 for t in known_titles
+            )
+            if is_title_dup:
+                dup_skipped += 1
+                continue
+
             db.table('news_items').insert({
                 'title':           item['title'],
                 'url':             item['url'],
@@ -131,10 +158,19 @@ def save_new_items(items: list[dict]) -> int:
                 'interest_score':  item.get('interest_score', 0),
                 'interest_level':  item.get('interest_level', 'medium'),
             }).execute()
+            known_titles.append(item['title'])  # 같은 배치 내 중복도 방지
             saved += 1
         except Exception as e:
             print(f'   저장 실패 ({item["title"][:30]}): {e}')
+    if dup_skipped:
+        print(f'   🔁 유사 제목 중복 {dup_skipped}건 스킵')
     return saved
+
+
+def get_news_by_id(news_id: str) -> dict | None:
+    """ID로 특정 뉴스 항목 반환 (status 무관)"""
+    res = get_client().table('news_items').select('*').eq('id', news_id).limit(1).execute()
+    return res.data[0] if res.data else None
 
 
 def get_next_news() -> dict | None:

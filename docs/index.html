@@ -863,18 +863,18 @@ async function loadNews(filter) {
 
 async function reserveNews(id) {
   if (!sb) return;
-  // interest_score를 최고값(999)으로 설정 → get_next_news() 에서 무조건 1순위 선택
-  var res = await sb.from('news_items').update({
-    interest_score: 999,
-    interest_level: 'high',
-    published_at: new Date().toISOString()
-  }).eq('id', id);
-  if (res.error) { toast('오류: ' + res.error.message); return; }
   if (cfg.token && cfg.repo) {
-    await triggerNewsActions();
-    toast('⚡ 선택한 뉴스 즉시 생성 시작');
+    // news_id를 직접 워크플로에 전달 → 해당 뉴스만 처리
+    var ok = await triggerNewsActions(id);
+    if (ok) toast('⚡ 선택한 뉴스 생성 시작');
   } else {
-    toast('📅 선택한 뉴스 1순위로 설정됨');
+    // GitHub Token 없으면 interest_score 부스트로 우선순위만 높임
+    var res = await sb.from('news_items').update({
+      interest_score: 999,
+      interest_level: 'high'
+    }).eq('id', id);
+    if (res.error) { toast('오류: ' + res.error.message); return; }
+    toast('📅 선택한 뉴스 1순위로 설정됨 (다음 실행 시 처리)');
   }
   loadNews(_newsFilter);
 }
@@ -910,13 +910,15 @@ async function triggerNews() {
   if (ok) toast('⚡ 뉴스 GitHub Actions 실행 중');
 }
 
-async function triggerNewsActions() {
+async function triggerNewsActions(newsId) {
   if (!cfg.token || !cfg.repo) return false;
   var parts = cfg.repo.split('/');
+  var payload = { ref: 'main' };
+  if (newsId) payload.inputs = { news_id: String(newsId) };
   var res = await fetch('https://api.github.com/repos/'+parts[0]+'/'+parts[1]+'/actions/workflows/news_shorts.yml/dispatches', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer '+cfg.token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ref:'main'})
+    body: JSON.stringify(payload)
   });
   if (!res.ok) { toast('GitHub 실행 실패: ' + res.status); return false; }
   return true;

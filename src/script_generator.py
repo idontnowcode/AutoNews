@@ -7,7 +7,13 @@ import json
 import re
 import anthropic
 
-client = anthropic.Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
+_client = None
+
+def _get_client() -> anthropic.Anthropic:
+    global _client
+    if _client is None:
+        _client = anthropic.Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
+    return _client
 
 PROMPT_TEMPLATE = '''
 당신은 경제 교육 YouTube Shorts 채널의 콘텐츠 제작자입니다.
@@ -24,6 +30,10 @@ PROMPT_TEMPLATE = '''
 - ★ 각 세그먼트 나레이션은 반드시 20~40자 이내 ★
   → 나레이션 하나가 짧은 한 문장이 되도록 핵심만 압축
   → 긴 설명은 여러 세그먼트로 나눔
+- ★ 말투: 친구에게 설명하듯 자연스러운 구어체 ★
+  좋은 예시: 쉽게 말하면요 / 이게 왜 중요하냐면요 / 생각해보면 당연한 거예요
+  나쁜 예시: 의미합니다 / 나타납니다 / ~입니다 (딱딱한 교과서체 금지)
+  → ~거든요, ~는데요, ~인 거예요, ~해요 등 자연스러운 구어 표현 사용
 - 세그먼트 구성 예시 (8개 기준):
     0: 호기심 유발 한 문장
     1: 개념 한 줄 정의
@@ -80,16 +90,79 @@ def fix_title_grammar(title: str) -> str:
     return f"'{topic}'{suffix}"
 
 
+def _repair_json_string(s: str) -> str:
+    """JSON 문자열 값 안의 이스케이프 안 된 큰따옴표를 단순 제거하는 최후 수단"""
+    # "narration": "텍스트 안에 "따옴표" 포함" 같은 패턴을 찾아 내부 따옴표를 제거
+    def fix_value(m):
+        inner = m.group(1)
+        # 값 내부의 따옴표를 단순 제거 (의미 손상 최소화)
+        inner = inner.replace('"', '')
+        return f'"{inner}"'
+    # JSON 문자열 값 패턴: ": "..." — 간단한 휴리스틱
+    return re.sub(r'": "([^"]*(?:"[^",:}\]]*){1,}[^"]*)"', fix_value, s)
+
+
 def extract_json(raw: str) -> dict:
     raw = re.sub(r'```[a-z]*', '', raw).strip('`').strip()
     match = re.search(r'\{.*\}', raw, re.DOTALL)
     if not match:
         raise ValueError('JSON 블록을 찾을 수 없음')
-    return json.loads(match.group())
+    json_str = match.group()
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError as e:
+        print(f'   ⚠️  JSON 파싱 오류: {e} — 복구 시도 중...')
+        print(f'   원본 (처음 200자): {json_str[:200]}')
+        repaired = _repair_json_string(json_str)
+        try:
+            return json.loads(repaired)
+        except json.JSONDecodeError:
+            raise ValueError(f'JSON 복구 실패: {e}') from e
+
+
+# ── 구독/좋아요 유도 아웃트로 ─────────────────────────────────────
+
+import os as _os
+
+# 고정 멘트 (사운드/이미지 모두 한 번만 생성 후 재사용)
+OUTRO_NARRATION = "구독이랑 좋아요 눌러주시면 더 열심히 만들게요!"
+
+OUTRO_IMAGE_PROMPT = (
+    "Cute cartoon character smiling and waving at the camera, "
+    "holding a large red subscribe button in one hand and a blue thumbs-up like button "
+    "in the other hand, bright cheerful colors, simple flat design, YouTube Shorts style"
+)
+
+# 프로젝트 루트 기준 고정 asset 경로
+_ASSET_DIR   = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), 'assets')
+OUTRO_IMAGE  = _os.path.join(_ASSET_DIR, 'outro_image.png')
+OUTRO_AUDIO  = _os.path.join(_ASSET_DIR, 'outro_audio.mp3')
+
+
+def append_outro(segments: list) -> list:
+    """마지막 세그먼트 뒤에 구독/좋아요 유도 멘트 추가.
+    assets/outro_image.png · outro_audio.mp3 가 존재하면 해당 파일을 직접 주입하여
+    DALL-E 이미지 생성 및 TTS 생성을 건너뜁니다.
+    """
+    idx = max((s.get('index', i) for i, s in enumerate(segments)), default=-1) + 1
+    seg: dict = {
+        'index':        idx,
+        'narration':    OUTRO_NARRATION,
+        'image_prompt': OUTRO_IMAGE_PROMPT,
+    }
+    if _os.path.exists(OUTRO_IMAGE):
+        seg['image_path'] = OUTRO_IMAGE
+    if _os.path.exists(OUTRO_AUDIO):
+        seg['audio_path'] = OUTRO_AUDIO
+    segments.append(seg)
+    img_ok = "OK" if _os.path.exists(OUTRO_IMAGE) else "MISSING"
+    aud_ok = "OK" if _os.path.exists(OUTRO_AUDIO) else "MISSING"
+    print(f'   [아웃트로] idx={idx} | image={img_ok} | audio={aud_ok}')
+    return segments
 
 
 def generate_script(topic: dict) -> dict:
-    msg = client.messages.create(
+    msg = _get_client().messages.create(
         model='claude-sonnet-4-6',
         max_tokens=2048,
         messages=[{
@@ -105,4 +178,5 @@ def generate_script(topic: dict) -> dict:
     result = extract_json(msg.content[0].text.strip())
     if 'title' in result:
         result['title'] = fix_title_grammar(result['title'])
+    result['segments'] = append_outro(result.get('segments', []))
     return result

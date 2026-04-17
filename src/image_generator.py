@@ -6,7 +6,13 @@ import base64
 import time
 from openai import OpenAI, RateLimitError
 
-client = OpenAI(api_key=os.environ['OPENAI_API_KEY'])
+_client = None
+
+def _get_client() -> OpenAI:
+    global _client
+    if _client is None:
+        _client = OpenAI(api_key=os.environ['OPENAI_API_KEY'])
+    return _client
 
 BASE_STYLE = (
     "educational cartoon illustration, bright white background, "
@@ -38,7 +44,7 @@ def generate_slide_image(prompt: str, output_path: str) -> str:
 
     for attempt in range(5):
         try:
-            response = client.images.generate(
+            response = _get_client().images.generate(
                 model="gpt-image-1",
                 prompt=full_prompt,
                 size="1024x1024",
@@ -58,16 +64,27 @@ def generate_slide_image(prompt: str, output_path: str) -> str:
 
 
 def generate_all_images(segments: list, out_dir: str) -> list:
-    """세그먼트 리스트에서 dalle_prompt 추출해 전체 이미지 생성"""
+    """세그먼트 리스트에서 dalle_prompt 추출해 전체 이미지 생성.
+    세그먼트에 image_path 가 이미 설정돼 있으면 해당 경로를 그대로 반환 (고정 asset 재사용).
+    """
     os.makedirs(out_dir, exist_ok=True)
     paths = []
+    gen_count = 0  # rate-limit sleep 은 실제 생성한 이미지 기준으로 카운트
     for i, seg in enumerate(segments):
-        idx    = seg.get('index', i)
+        idx = seg.get('index', i)
+
+        # 이미 경로가 주입된 고정 asset → 생성 건너뜀
+        if seg.get('image_path') and os.path.exists(seg['image_path']):
+            print(f'   이미지 스킵 [{i+1}/{len(segments)}]: 고정 asset 사용')
+            paths.append(seg['image_path'])
+            continue
+
         prompt = seg.get('image_prompt') or seg.get('dalle_prompt', 'abstract finance concept visualization')
         path   = os.path.join(out_dir, f'image_{idx:02d}.png')
         print(f'   이미지 생성 중 [{i+1}/{len(segments)}]: {prompt[:60]}...')
-        if i > 0:
+        if gen_count > 0:
             time.sleep(_IMAGE_INTERVAL_SEC)
         generate_slide_image(prompt, path)
         paths.append(path)
+        gen_count += 1
     return paths
