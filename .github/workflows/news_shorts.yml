@@ -2,7 +2,7 @@ name: 일분 스튜디오 - 뉴스 Shorts 업로드
 
 on:
   schedule:
-    - cron: '0 */6 * * *'   # 6시간마다 (UTC) — 하루 4회
+    - cron: '0 * * * *'    # 매시간 — 실제 실행 여부는 Supabase settings로 제어
   workflow_dispatch:
     inputs:
       news_id:
