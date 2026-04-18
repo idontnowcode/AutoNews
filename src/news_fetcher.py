@@ -93,8 +93,8 @@ def fetch_rss_items(max_per_feed: int = DEFAULT_MAX_PER_FEED,
                     language: str = 'ko') -> list[dict]:
     """
     RSS 피드에서 뉴스 수집.
-    language='ko' → 국내 언론사(RSS_FEEDS_KO)
-    language='en' → 해외 언론사(RSS_FEEDS_EN)
+    국내(RSS_FEEDS_KO) + 해외(RSS_FEEDS_EN) 피드를 항상 동시에 수집.
+    language 파라미터는 스크립트 생성 단계에서만 사용 (수집 시 무시).
     categories=None이면 settings의 news_categories 사용
     """
     if categories is None:
@@ -102,13 +102,13 @@ def fetch_rss_items(max_per_feed: int = DEFAULT_MAX_PER_FEED,
         raw = settings.get('news_categories', '경제')
         categories = [c.strip() for c in raw.split(',') if c.strip()]
 
-    feed_map = RSS_FEEDS_EN if language == 'en' else RSS_FEEDS_KO
-    lang_label = '🌐 해외' if language == 'en' else '🇰🇷 국내'
-    print(f'   {lang_label} 피드 선택 (language={language})')
+    print(f'   🇰🇷 국내 + 🌐 해외 피드 동시 수집')
 
     feeds = []
     for cat in categories:
-        for source, url in feed_map.get(cat, []):
+        for source, url in RSS_FEEDS_KO.get(cat, []):
+            feeds.append((source, url, cat))
+        for source, url in RSS_FEEDS_EN.get(cat, []):
             feeds.append((source, url, cat))
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=24)  # 24시간 이내만 허용
@@ -292,10 +292,18 @@ def get_next_high_interest_news() -> dict | None:
     return None
 
 
+INTL_CATEGORIES = ('국제', '사회')   # 국제·사회 분야 우선 순위 기준
+
 def auto_queue_top_news() -> bool:
     """
-    pending 중 interest_score 최고 뉴스 1건을 queued로 자동 등록.
+    pending 중 최적 뉴스 1건을 queued로 자동 등록.
     이미 queued 항목이 있으면 스킵 (중복 방지).
+
+    우선순위:
+      1. high 관심도 (분야 무관)
+      2. medium 관심도 중 국제·사회 분야
+      3. medium 관심도 (분야 무관)
+
     반환: 등록 여부 (True=등록됨, False=스킵)
     """
     db = get_client()
@@ -306,22 +314,34 @@ def auto_queue_top_news() -> bool:
         print('   ⏭️  이미 대기 큐에 항목 있음 — 자동 큐 등록 스킵')
         return False
 
-    # high → medium 순으로 최고점 뉴스 1건 선택
-    for level in ('high', 'medium'):
-        res = (db.table('news_items')
-                 .select('id,title,interest_level,interest_score')
-                 .eq('status', 'pending')
-                 .eq('interest_level', level)
-                 .order('interest_score', desc=True)
-                 .order('published_at', desc=True)
-                 .limit(1)
-                 .execute())
+    def _query(level: str, categories: tuple | None = None):
+        q = (db.table('news_items')
+               .select('id,title,category,interest_level,interest_score')
+               .eq('status', 'pending')
+               .eq('interest_level', level)
+               .order('interest_score', desc=True)
+               .order('published_at', desc=True)
+               .limit(1))
+        if categories:
+            q = q.in_('category', list(categories))
+        return q.execute()
+
+    candidates = [
+        ('high',   None),                # 1순위: high 전체
+        ('medium', INTL_CATEGORIES),     # 2순위: medium 중 국제·사회
+        ('medium', None),                # 3순위: medium 전체
+    ]
+
+    for level, cats in candidates:
+        res = _query(level, cats)
         if res.data:
             item = res.data[0]
             mark_news_queued(item['id'])
-            print(f'   🤖 자동 큐 등록: [{item["interest_level"]}|{item["interest_score"]}] '
-                  f'{item["title"][:45]}')
+            cat_label = f'[{item["category"]}]' if cats else ''
+            print(f'   🤖 자동 큐 등록: [{item["interest_level"]}|{item["interest_score"]}]'
+                  f'{cat_label} {item["title"][:45]}')
             return True
+
     print('   📭 자동 큐 등록할 pending 뉴스 없음')
     return False
 
