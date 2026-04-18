@@ -571,26 +571,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
       <button onclick="saveAutoSettings(); toast('✅ 예약 발행 설정 저장됨')" class="btn-primary" style="margin-top:8px">💾 예약 발행 저장</button>
     </div>
 
-    <!-- 콘텐츠 언어 카드 -->
-    <div class="card" style="padding:16px">
-      <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">🌐 콘텐츠 언어</div>
-      <div style="font-size:12px;color:#666;margin-bottom:14px;line-height:1.6">
-        업로드될 YouTube 영상의 언어를 선택합니다.<br>
-        <span style="font-size:11px;color:#444">스크립트 · TTS 음성 · YouTube 채널이 함께 전환됩니다.</span>
-      </div>
-      <div style="display:flex;gap:10px;margin-bottom:10px">
-        <button id="langTabBtnKo" onclick="setContentLang('ko')"
-          style="flex:1;padding:14px;border-radius:10px;border:2px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;font-weight:700;font-size:15px;cursor:pointer;transition:all .15s">
-          🇰🇷 한국어
-        </button>
-        <button id="langTabBtnEn" onclick="setContentLang('en')"
-          style="flex:1;padding:14px;border-radius:10px;border:2px solid #ffffff20;background:transparent;color:#555;font-weight:700;font-size:15px;cursor:pointer;transition:all .15s">
-          🇺🇸 English
-        </button>
-      </div>
-      <div style="font-size:11px;color:#555;text-align:center">현재 설정: <span id="langTabCurrent" style="color:#FFD60A;font-weight:700">한국어</span></div>
-    </div>
-
   </div>
 </div>
 
@@ -692,21 +672,6 @@ function setContentLang(lang, skipSave) {
       ko.style.cssText = base + 'border:1px solid #ffffff20;background:transparent;color:#555;';
     }
   }
-  // ── 자동화 탭 언어 버튼 ──────────────────────────
-  var tabKo  = document.getElementById('langTabBtnKo');
-  var tabEn  = document.getElementById('langTabBtnEn');
-  var tabCur = document.getElementById('langTabCurrent');
-  var tabBase = 'flex:1;padding:14px;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer;transition:all .15s;';
-  if (tabKo && tabEn) {
-    if (lang === 'ko') {
-      tabKo.style.cssText = tabBase + 'border:2px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;';
-      tabEn.style.cssText = tabBase + 'border:2px solid #ffffff20;background:transparent;color:#555;';
-    } else {
-      tabEn.style.cssText = tabBase + 'border:2px solid #4f9eff55;background:#4f9eff22;color:#4f9eff;';
-      tabKo.style.cssText = tabBase + 'border:2px solid #ffffff20;background:transparent;color:#555;';
-    }
-  }
-  if (tabCur) tabCur.textContent = lang === 'ko' ? '한국어' : 'English';
   // ── Supabase 자동 저장 (debounce 500ms) ──────────
   if (!skipSave && sb) {
     clearTimeout(_langSaveTimer);
@@ -913,10 +878,14 @@ async function saveAutoSettings() {
   var daySet = {};
   _scheduleSlots.forEach(function(s){ daySet[s.day || 'everyday'] = true; });
   var schedDays = (Object.keys(daySet).length === 0 || daySet['everyday']) ? 'everyday' : Object.keys(daySet).join(',');
+  // 슬롯 언어에서 content_language 도출 (뉴스 슬롯 우선, 없으면 첫 슬롯, 기본 ko)
+  var newsSlotLang = (_scheduleSlots.find(function(s){ return s.category === 'news'; }) || {}).lang;
+  var contentLang  = newsSlotLang || (_scheduleSlots[0] || {}).lang || 'ko';
   var rows = [
     { key: 'upload_schedule_enabled', value: String(schedEnabled) },
     { key: 'upload_schedule_days',    value: schedDays },
-    { key: 'upload_schedule_slots',   value: JSON.stringify(_scheduleSlots) }
+    { key: 'upload_schedule_slots',   value: JSON.stringify(_scheduleSlots) },
+    { key: 'content_language',        value: contentLang }
   ];
   for (var i = 0; i < rows.length; i++) {
     await sb.from('settings').upsert(rows[i], { onConflict: 'key' });
