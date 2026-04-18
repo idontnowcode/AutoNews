@@ -507,43 +507,65 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
       </div>
 
       <div id="cfgScheduleRow" style="display:none">
-        <!-- 요일 -->
-        <div style="margin-bottom:14px">
-          <label class="form-label">발행 요일</label>
-          <div style="display:flex;gap:5px;margin-bottom:6px;flex-wrap:wrap">
-            <button type="button" onclick="setScheduleDays('everyday')"
-              style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;cursor:pointer">매일</button>
-            <button type="button" onclick="setScheduleDays('mon,tue,wed,thu,fri')"
-              style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">평일</button>
-            <button type="button" onclick="setScheduleDays('mon,wed,fri')"
-              style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">월수금</button>
-            <button type="button" onclick="setScheduleDays('sat,sun')"
-              style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">주말</button>
+        <!-- 새 슬롯 추가 폼 -->
+        <div style="background:#ffffff08;border-radius:10px;padding:12px;margin-bottom:12px">
+          <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">새 예약 추가</div>
+
+          <!-- 발행 요일 -->
+          <div style="margin-bottom:10px">
+            <div style="font-size:11px;color:#777;margin-bottom:5px;font-weight:600">발행 요일</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              <button type="button" id="nsDay_everyday" onclick="setNewSlotDay('everyday')" style="font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid #FFD60A88;background:#FFD60A22;color:#FFD60A;cursor:pointer">매일</button>
+              <button type="button" id="nsDay_mon" onclick="setNewSlotDay('mon')" style="font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid #ffffff20;background:transparent;color:#666;cursor:pointer">월</button>
+              <button type="button" id="nsDay_tue" onclick="setNewSlotDay('tue')" style="font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid #ffffff20;background:transparent;color:#666;cursor:pointer">화</button>
+              <button type="button" id="nsDay_wed" onclick="setNewSlotDay('wed')" style="font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid #ffffff20;background:transparent;color:#666;cursor:pointer">수</button>
+              <button type="button" id="nsDay_thu" onclick="setNewSlotDay('thu')" style="font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid #ffffff20;background:transparent;color:#666;cursor:pointer">목</button>
+              <button type="button" id="nsDay_fri" onclick="setNewSlotDay('fri')" style="font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid #ffffff20;background:transparent;color:#666;cursor:pointer">금</button>
+              <button type="button" id="nsDay_sat" onclick="setNewSlotDay('sat')" style="font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid #ffffff20;background:transparent;color:#666;cursor:pointer">토</button>
+              <button type="button" id="nsDay_sun" onclick="setNewSlotDay('sun')" style="font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid #ffffff20;background:transparent;color:#666;cursor:pointer">일</button>
+            </div>
           </div>
-          <input id="cfgScheduleDays" class="form-input" type="text" value="everyday"
-            placeholder="everyday 또는 mon,tue,...">
-          <div style="font-size:11px;color:#555;margin-top:3px">everyday=매일 / mon 월 · tue 화 · wed 수 · thu 목 · fri 금 · sat 토 · sun 일</div>
+
+          <!-- 발행 시간 -->
+          <div style="margin-bottom:10px">
+            <div style="font-size:11px;color:#777;margin-bottom:5px;font-weight:600">발행 시간 (KST)</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input id="newSlotHour" type="number" min="0" max="23" value="20"
+                oninput="updateEstHint(this.value)"
+                style="width:58px;background:#ffffff12;border:1px solid #ffffff25;border-radius:6px;color:#fff;font-size:14px;padding:5px 8px;text-align:center">
+              <span style="font-size:12px;color:#777">시</span>
+              <span id="estHint" style="font-size:11px;color:#555"></span>
+            </div>
+          </div>
+
+          <!-- 콘텐츠 + 언어 -->
+          <div style="display:flex;gap:10px;margin-bottom:12px">
+            <div style="flex:1">
+              <div style="font-size:11px;color:#777;margin-bottom:5px;font-weight:600">콘텐츠</div>
+              <div style="display:flex;gap:4px">
+                <button type="button" id="nscat_news" onclick="setNewSlotCat('news')"
+                  style="flex:1;font-size:11px;padding:6px 4px;border-radius:6px;border:1px solid #34d39988;background:#34d39922;color:#34d399;cursor:pointer">📰 뉴스</button>
+                <button type="button" id="nscat_curriculum" onclick="setNewSlotCat('curriculum')"
+                  style="flex:1;font-size:11px;padding:6px 4px;border-radius:6px;border:1px solid #ffffff20;background:transparent;color:#666;cursor:pointer">📚 커리큘럼</button>
+              </div>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:11px;color:#777;margin-bottom:5px;font-weight:600">언어</div>
+              <div style="display:flex;gap:4px">
+                <button type="button" id="nslang_ko" onclick="setNewSlotLang('ko')"
+                  style="flex:1;font-size:11px;padding:6px 4px;border-radius:6px;border:1px solid #FFD60A88;background:#FFD60A22;color:#FFD60A;cursor:pointer">🇰🇷 KOR</button>
+                <button type="button" id="nslang_en" onclick="setNewSlotLang('en')"
+                  style="flex:1;font-size:11px;padding:6px 4px;border-radius:6px;border:1px solid #ffffff20;background:transparent;color:#666;cursor:pointer">🇺🇸 ENG</button>
+              </div>
+            </div>
+          </div>
+
+          <button type="button" onclick="addScheduleSlot()"
+            style="width:100%;padding:8px;background:#FFD60A;color:#000;font-weight:700;font-size:13px;border:none;border-radius:8px;cursor:pointer">+ 추가</button>
         </div>
 
-        <!-- 시간 슬롯 추가 -->
-        <div style="margin-bottom:8px">
-          <label class="form-label">발행 시간 · 콘텐츠 추가</label>
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
-            <input id="newSlotHour" type="number" min="0" max="23" value="20"
-              oninput="updateEstHint(this.value)"
-              style="width:58px;background:#ffffff12;border:1px solid #ffffff25;border-radius:6px;color:#fff;font-size:13px;padding:5px 8px;text-align:center">
-            <span style="font-size:12px;color:#777">시 (KST)</span>
-            <span id="estHint" style="font-size:11px;color:#555"></span>
-            <select id="newSlotCategory"
-              style="background:#1a1a1a;border:1px solid #ffffff25;border-radius:6px;color:#fff;font-size:12px;padding:5px 8px;cursor:pointer">
-              <option value="news">📰 뉴스</option>
-              <option value="curriculum">📚 커리큘럼</option>
-            </select>
-            <button type="button" onclick="addScheduleSlot()"
-              style="padding:5px 14px;background:#FFD60A;color:#000;font-weight:700;font-size:14px;border:none;border-radius:6px;cursor:pointer">+</button>
-          </div>
-          <div id="scheduleSlotList"></div>
-        </div>
+        <!-- 슬롯 리스트 -->
+        <div id="scheduleSlotList"></div>
       </div>
 
       <button onclick="saveAutoSettings(); toast('✅ 예약 발행 설정 저장됨')" class="btn-primary" style="margin-top:8px">💾 예약 발행 저장</button>
@@ -754,9 +776,50 @@ function openModal() {
 }
 
 // ── 예약 발행 설정 ────────────────────────────────
-var _scheduleSlots   = []; // [{hour:20, category:'curriculum'}, ...]
+var _scheduleSlots   = []; // [{day:'everyday', hour:20, category:'news', lang:'ko'}, ...]
 var _schedEnabled    = false;
 var _scheduleDays    = 'everyday';
+
+// 새 슬롯 추가 폼 상태
+var _newSlotDay  = 'everyday';
+var _newSlotCat  = 'news';
+var _newSlotLang = 'ko';
+var _SLOT_DAY_KEYS = ['everyday','mon','tue','wed','thu','fri','sat','sun'];
+
+function setNewSlotDay(val) {
+  _newSlotDay = val;
+  _SLOT_DAY_KEYS.forEach(function(d) {
+    var btn = document.getElementById('nsDay_' + d);
+    if (!btn) return;
+    var active = (d === val);
+    btn.style.cssText = 'font-size:11px;padding:4px 9px;border-radius:6px;cursor:pointer;'
+      + (active ? 'border:1px solid #FFD60A88;background:#FFD60A22;color:#FFD60A'
+                : 'border:1px solid #ffffff20;background:transparent;color:#666');
+  });
+}
+function setNewSlotCat(val) {
+  _newSlotCat = val;
+  var colors = {news:'#34d399', curriculum:'#FFD60A'};
+  ['news','curriculum'].forEach(function(c) {
+    var btn = document.getElementById('nscat_' + c);
+    if (!btn) return;
+    var active = (c === val), col = colors[c];
+    btn.style.cssText = 'flex:1;font-size:11px;padding:6px 4px;border-radius:6px;cursor:pointer;'
+      + (active ? 'border:1px solid ' + col + '88;background:' + col + '22;color:' + col
+                : 'border:1px solid #ffffff20;background:transparent;color:#666');
+  });
+}
+function setNewSlotLang(val) {
+  _newSlotLang = val;
+  var koBtn = document.getElementById('nslang_ko');
+  var enBtn = document.getElementById('nslang_en');
+  if (koBtn) koBtn.style.cssText = 'flex:1;font-size:11px;padding:6px 4px;border-radius:6px;cursor:pointer;'
+    + (val==='ko' ? 'border:1px solid #FFD60A88;background:#FFD60A22;color:#FFD60A'
+                  : 'border:1px solid #ffffff20;background:transparent;color:#666');
+  if (enBtn) enBtn.style.cssText = 'flex:1;font-size:11px;padding:6px 4px;border-radius:6px;cursor:pointer;'
+    + (val==='en' ? 'border:1px solid #93c5fd88;background:#93c5fd22;color:#93c5fd'
+                  : 'border:1px solid #ffffff20;background:transparent;color:#666');
+}
 
 function toggleScheduleSwitch() {
   var cb = document.getElementById('cfgScheduleEnabled');
@@ -772,17 +835,14 @@ function updateScheduleToggleUI(on) {
   knob.style.left         = on ? '22px'    : '2px';
   row.style.display       = on ? 'block'   : 'none';
 }
-function setScheduleDays(val) {
-  document.getElementById('cfgScheduleDays').value = val;
-}
-
 function addScheduleSlot() {
   var hour = parseInt(document.getElementById('newSlotHour').value, 10);
-  var cat  = document.getElementById('newSlotCategory').value;
   if (isNaN(hour) || hour < 0 || hour > 23) { toast('0~23 사이 시간을 입력하세요'); return; }
-  var exists = _scheduleSlots.some(function(s){ return s.hour === hour && s.category === cat; });
+  var exists = _scheduleSlots.some(function(s){
+    return s.hour === hour && s.category === _newSlotCat && (s.day || 'everyday') === _newSlotDay;
+  });
   if (exists) { toast('이미 추가된 슬롯입니다'); return; }
-  _scheduleSlots.push({hour: hour, category: cat});
+  _scheduleSlots.push({day: _newSlotDay, hour: hour, category: _newSlotCat, lang: _newSlotLang});
   _scheduleSlots.sort(function(a, b){ return a.hour - b.hour; });
   renderScheduleSlots();
 }
@@ -797,23 +857,33 @@ function renderScheduleSlots() {
     el.innerHTML = '<div style="font-size:11px;color:#444;padding:6px 0">추가된 예약이 없습니다</div>';
     return;
   }
-  var CAT = {curriculum: {label:'📚 커리큘럼', color:'#FFD60A'}, news: {label:'📰 뉴스', color:'#34d399'}};
+  var CAT  = {curriculum:{label:'📚 커리큘럼', color:'#FFD60A'}, news:{label:'📰 뉴스', color:'#34d399'}};
+  var LANG = {ko:'🇰🇷 KOR', en:'🇺🇸 ENG'};
+  var DAYL = {everyday:'매일', mon:'월', tue:'화', wed:'수', thu:'목', fri:'금', sat:'토', sun:'일'};
   var etLabel = isEDT() ? 'EDT' : 'EST';
   el.innerHTML = _scheduleSlots.map(function(s, i) {
     var h   = String(s.hour).padStart(2, '0');
     var etH = String(kstToEt(s.hour)).padStart(2, '0');
-    var c   = CAT[s.category] || {label: s.category, color: '#aaa'};
+    var c   = CAT[s.category]  || {label: s.category, color: '#aaa'};
+    var dl  = DAYL[s.day || 'everyday'] || s.day || '매일';
+    var ll  = LANG[s.lang || 'ko']      || '🇰🇷 KOR';
     return '<div style="display:flex;align-items:center;justify-content:space-between;'
-      + 'padding:7px 10px;background:#ffffff0a;border-radius:8px;margin-bottom:5px">'
-      + '<div>'
-      + '<span style="font-size:14px;font-weight:700;color:#fff">' + h + ':00 KST</span>'
-      + '<span style="font-size:11px;color:#555;margin-left:5px">(' + etH + ':00 ' + etLabel + ')</span>'
+      + 'padding:8px 10px;background:#ffffff0a;border-radius:8px;margin-bottom:5px;gap:8px">'
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="display:flex;align-items:baseline;gap:6px">'
+      + '<span style="font-size:13px;font-weight:700;color:#fff">' + h + ':00 KST</span>'
+      + '<span style="font-size:10px;color:#555">(' + etH + ':00 ' + etLabel + ')</span>'
       + '</div>'
-      + '<span style="font-size:11px;padding:2px 9px;background:' + c.color + '22;color:' + c.color
-        + ';border-radius:10px;border:1px solid ' + c.color + '44">' + c.label + '</span>'
+      + '<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">'
+      + '<span style="font-size:10px;padding:1px 7px;background:#ffffff12;color:#aaa;border-radius:6px">' + dl + '</span>'
+      + '<span style="font-size:10px;padding:1px 7px;background:' + c.color + '22;color:' + c.color
+        + ';border-radius:6px;border:1px solid ' + c.color + '33">' + c.label + '</span>'
+      + '<span style="font-size:10px;padding:1px 7px;background:#3b82f622;color:#93c5fd;border-radius:6px">' + ll + '</span>'
+      + '</div>'
+      + '</div>'
       + '<button type="button" onclick="removeScheduleSlot(' + i + ')" '
         + 'style="font-size:16px;color:#ef4444;background:none;border:none;cursor:pointer;'
-        + 'padding:0 4px;line-height:1">−</button>'
+        + 'padding:0 4px;line-height:1;flex-shrink:0">−</button>'
       + '</div>';
   }).join('');
 }
@@ -828,7 +898,6 @@ async function loadAutoSettings() {
   var schedEnabled = s['upload_schedule_enabled'] === 'true';
   document.getElementById('cfgScheduleEnabled').checked = schedEnabled;
   updateScheduleToggleUI(schedEnabled);
-  if (s['upload_schedule_days']) document.getElementById('cfgScheduleDays').value = s['upload_schedule_days'];
   try { _scheduleSlots = JSON.parse(s['upload_schedule_slots'] || '[]'); } catch(e) { _scheduleSlots = []; }
   renderScheduleSlots();
   // 언어 설정 로드 (저장 없이 UI만 반영)
@@ -840,7 +909,10 @@ async function loadAutoSettings() {
 async function saveAutoSettings() {
   if (!sb) return;
   var schedEnabled = document.getElementById('cfgScheduleEnabled').checked;
-  var schedDays    = document.getElementById('cfgScheduleDays').value.trim() || 'everyday';
+  // 슬롯별 요일에서 전역 days 도출 (백엔드 호환용)
+  var daySet = {};
+  _scheduleSlots.forEach(function(s){ daySet[s.day || 'everyday'] = true; });
+  var schedDays = (Object.keys(daySet).length === 0 || daySet['everyday']) ? 'everyday' : Object.keys(daySet).join(',');
   var rows = [
     { key: 'upload_schedule_enabled', value: String(schedEnabled) },
     { key: 'upload_schedule_days',    value: schedDays },
@@ -1480,7 +1552,7 @@ async function loadCostStats() {
   // 커리큘럼 + 뉴스 병렬 조회
   var [resV, resN] = await Promise.all([
     sb.from('videos').select('created_at,script_json,slide_prompts').order('created_at', {ascending: false}).limit(200),
-    sb.from('news_items').select('created_at').eq('status','done').order('created_at', {ascending: false}).limit(200)
+    sb.from('news_items').select('created_at,youtube_id').not('youtube_id', 'is', null).order('created_at', {ascending: false}).limit(200)
   ]);
 
   var currVids = (resV.data || []).map(function(v){ return { created_at: v.created_at, segs: _extractSegs(v), type: '커리큘럼' }; });

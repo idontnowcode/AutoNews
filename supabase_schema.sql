@@ -98,6 +98,15 @@ ALTER TABLE news_items
   ADD COLUMN IF NOT EXISTS interest_level  TEXT    DEFAULT 'medium'
     CHECK (interest_level IN ('low', 'medium', 'high'));
 
+-- ============================================================
+-- 뉴스 YouTube 업로드 완료 기록 컬럼 (비용 통계 카운팅용)
+-- ============================================================
+ALTER TABLE news_items
+  ADD COLUMN IF NOT EXISTS youtube_id TEXT;    -- 업로드 완료 시 채워짐 (NULL = 미업로드)
+
+CREATE INDEX IF NOT EXISTS idx_news_youtube_id ON news_items(youtube_id)
+  WHERE youtube_id IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_news_interest ON news_items(interest_score DESC, published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_news_level    ON news_items(interest_level);
 

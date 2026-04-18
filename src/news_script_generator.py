@@ -24,6 +24,22 @@ NEWS_PROMPT = '''
 기사 요약: {summary}
 분야: {category}
 
+[경제 관련성 체크 — 먼저 확인]
+- 이 뉴스가 시청자의 돈·경제생활에 어떤 영향을 주는가?
+  → 한 줄 답변이 가능한 경우에만 진행. 경제 앵글이 없으면 경제 영향 중심으로 재구성할 것.
+- 스포츠 뉴스: 이적료·연봉·구단 가치·스폰서십 등 경제 관련 앵글이 있을 때만 채택.
+  경기 결과·예고·선수 퍼포먼스만 다루는 경우 → 경제 영향 세그먼트를 반드시 포함.
+- 정치 뉴스: 특정 정치인 비판성 단독 콘텐츠 지양 → 정책이 경제·생활에 미치는 영향 중심으로 구성.
+
+[제목 공식 — 반드시 준수]
+✅ 성공 공식: [구체적 숫자/사실] + [즉각적 결과] + [경제적 의미]
+   좋은 예시: "코스피 6000 돌파! 하이닉스 6% 급등의 비밀"
+   좋은 예시: "이란 발표 하나에 기름값 11% 폭락!"
+❌ 피해야 할 유형:
+   - 결과 없는 예고형: "낮 2시 맞대결 예고!"
+   - 숫자/임팩트 없는 막연한 제목: "경제 동향 분석"
+→ 제목(title)은 30자 이내이되 숫자 또는 즉각 결과가 반드시 포함되어야 함.
+
 [요구사항]
 - 대상: {category} 분야에 관심 있는 20~40대
 - 세그먼트 수: 6~8개
@@ -34,10 +50,10 @@ NEWS_PROMPT = '''
     나쁜 예시: 발표했습니다 / 밝혔습니다 / 시행될 예정입니다 (뉴스 리딩체 금지)
     → ~했어요, ~거든요, ~는데요, ~인 거예요 등 구어 표현 사용
 - 세그먼트 구성:
-    0: 헤드라인 한 줄 요약 (시청자 관심 유발 — 반드시 구어체)
+    0: ★ 숫자 또는 즉각 결과가 담긴 헤드라인 (시청자 관심 유발 — 반드시 구어체) ★
     1: 무슨 일이 일어났나? (쉽고 친근하게)
     2~5: 핵심 내용 / 배경 / 숫자/데이터 (대화하듯)
-    마지막: 영향 또는 전망 (짧고 임팩트 있게)
+    마지막: 내 돈·생활에 미치는 영향 (짧고 임팩트 있게)
 
 [이미지 프롬프트 규칙 — 영어로만]
 - 반드시 영어로 작성 (한글/한자 절대 금지)
@@ -83,6 +99,22 @@ Source: {source}
 Summary: {summary}
 Category: {category}
 
+[Economic Relevance Check — Do First]
+- Can you answer in one line: "How does this news affect the viewer's money or economic life?"
+  → Only proceed if yes. If not, reframe around economic impact.
+- Sports news: only adopt if there's an economic angle (transfer fees, salaries, team valuation, sponsorship).
+  If it's only about game results → add an economic impact segment.
+- Political news: avoid single-politician criticism → focus on how policy affects economy/daily life.
+
+[Title Formula — Strictly Follow]
+✅ Success formula: [Specific number/fact] + [Immediate result] + [Economic meaning]
+   Good: "Oil prices crash 11% after Iran's announcement!"
+   Good: "Kospi breaks 6000 — what's driving SK Hynix's 6% surge?"
+❌ Avoid:
+   - Preview without result: "Big matchup at 2pm today!"
+   - Vague with no numbers: "Economic trends analysis"
+→ title must be under 70 chars AND include a number or immediate result.
+
 [Requirements]
 - Target: 20-40s interested in {category}
 - Segments: 6-8
@@ -93,10 +125,10 @@ Category: {category}
   Bad: "announced" / "stated" / "will be implemented" (no news-anchor language)
   → Use contractions and casual phrasing
 - Structure:
-    0: One-line headline hook (grab attention — conversational)
+    0: ★ Headline hook with a number or immediate result (conversational) ★
     1: What happened? (simple, friendly)
     2-5: Key facts / background / numbers (informal)
-    Last: Impact or outlook (short, punchy)
+    Last: How this affects YOUR money or daily life (short, punchy)
 
 [Image prompt rules — English only]
 - Write in English only
