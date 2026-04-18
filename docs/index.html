@@ -161,16 +161,16 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 
 <!-- 탭 -->
 <div class="tabs" style="overflow-x:auto;flex-wrap:nowrap">
-  <button class="tab-btn" id="tabBtn0" onclick="showTab(0)" style="opacity:0.35;pointer-events:none" title="준비 중">📚 커리큘럼</button>
-  <button class="tab-btn active" id="tabBtn1" onclick="showTab(1)">🎬 영상 요청</button>
-  <button class="tab-btn" id="tabBtn2" onclick="showTab(2)">📋 히스토리</button>
-  <button class="tab-btn" id="tabBtn3" onclick="showTab(3)">📰 뉴스</button>
+  <button class="tab-btn" id="tabBtn0" onclick="showTab(0)" style="display:none">📚 커리큘럼</button>
+  <button class="tab-btn" id="tabBtn1" onclick="showTab(1)" style="display:none">🎬 영상 요청</button>
+  <button class="tab-btn" id="tabBtn2" onclick="showTab(2)" style="display:none">📋 히스토리</button>
+  <button class="tab-btn active" id="tabBtn3" onclick="showTab(3)">📰 뉴스</button>
   <button class="tab-btn" id="tabBtn4" onclick="showTab(4)">💰 비용</button>
   <button class="tab-btn" id="tabBtn5" onclick="showTab(5)">📊 리포트</button>
 </div>
 
 <!-- 탭 0: 커리큘럼 -->
-<div id="tabPane0">
+<div id="tabPane0" style="display:none">
   <div class="section">
 
     <div class="card progress-card">
@@ -251,8 +251,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 </div>
 
 <!-- 탭 3: 뉴스 -->
-<div id="tabPane3" style="display:none">
+<div id="tabPane3">
   <div class="section" style="padding:16px">
+
+    <!-- 자동화 현황 카드 -->
+    <div class="card" id="autoStatusCard" style="margin-bottom:10px;padding:12px 14px">
+      <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🤖 자동화 현황</div>
+      <div id="autoStatusBody" style="font-size:12px;color:#ccc">로딩 중...</div>
+    </div>
 
     <!-- 헤더 -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -340,9 +346,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 
     <!-- 실행 대기 리스트 -->
     <div id="queuedSection" style="margin-bottom:10px">
-      <div style="font-size:11px;font-weight:700;color:#FFD60A;margin-bottom:6px;display:flex;align-items:center;gap:6px">
-        📋 실행 대기 리스트
-        <span style="font-size:10px;color:#666;font-weight:400">— 여기 있는 뉴스가 자동화 시 우선 처리됩니다</span>
+      <div style="font-size:11px;font-weight:700;color:#FFD60A;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px">
+        <div style="display:flex;align-items:center;gap:6px">
+          📋 실행 대기 리스트
+          <span style="font-size:10px;color:#666;font-weight:400">— 우선 처리</span>
+        </div>
+        <span id="queuedNextTime" style="font-size:10px;color:#888"></span>
       </div>
       <div class="card" id="queuedContainer" style="border:1px solid #FFD60A30;background:#FFD60A06">
         <div style="color:#444;font-size:12px;text-align:center;padding:14px">대기 중인 뉴스 없음</div>
@@ -695,7 +704,9 @@ function openModal() {
 }
 
 // ── 예약 발행 설정 ────────────────────────────────
-var _scheduleSlots = []; // [{hour:20, category:'curriculum'}, ...]
+var _scheduleSlots   = []; // [{hour:20, category:'curriculum'}, ...]
+var _schedEnabled    = false;
+var _scheduleDays    = 'everyday';
 
 function toggleScheduleSwitch() {
   var cb = document.getElementById('cfgScheduleEnabled');
@@ -807,7 +818,13 @@ async function loadAutoSettingsForHeader() {
   var days = s['upload_schedule_days'] || 'everyday';
   var slots = [];
   try { slots = JSON.parse(s['upload_schedule_slots'] || '[]'); } catch(e) {}
+  // 전역 상태 갱신
+  _schedEnabled = schedEnabled;
+  _scheduleDays = days;
+  _scheduleSlots = slots;
   updateScheduleHeaderBadge(schedEnabled, days, slots);
+  updateAutoStatusCard();
+  updateQueuedNextTime();
 }
 
 function updateScheduleHeaderBadge(enabled, days, slots) {
@@ -818,20 +835,122 @@ function updateScheduleHeaderBadge(enabled, days, slots) {
     badge.style.color = '#555';
     return;
   }
-  var dayLabel = days === 'everyday' ? '매일'
-    : days === 'mon,tue,wed,thu,fri' ? '평일'
-    : days === 'sat,sun' ? '주말'
-    : days.replace(/mon/g,'월').replace(/tue/g,'화').replace(/wed/g,'수')
-          .replace(/thu/g,'목').replace(/fri/g,'금').replace(/sat/g,'토').replace(/sun/g,'일');
-  var times = slots.map(function(s){
-    return String(s.hour).padStart(2,'0') + '시(' + (s.category === 'news' ? '뉴스' : '커리') + ')';
-  }).join(' · ');
-  badge.textContent = '📅 ' + dayLabel + ' ' + times;
-  badge.style.color = '#FFD60A';
+  var info = getNextNewsSlotInfo(slots);
+  if (info) {
+    badge.textContent = '📅 다음 ' + info.dayLabel + ' ' + String(info.kstH).padStart(2,'0') + ':00 — ' + info.countdown;
+    badge.style.color = '#FFD60A';
+  } else {
+    var dayLabel = days === 'everyday' ? '매일'
+      : days === 'mon,tue,wed,thu,fri' ? '평일'
+      : days === 'sat,sun' ? '주말'
+      : days.replace(/mon/g,'월').replace(/tue/g,'화').replace(/wed/g,'수')
+            .replace(/thu/g,'목').replace(/fri/g,'금').replace(/sat/g,'토').replace(/sun/g,'일');
+    var times = slots.map(function(s){
+      return String(s.hour).padStart(2,'0') + '시(' + (s.category === 'news' ? '뉴스' : '커리') + ')';
+    }).join(' · ');
+    badge.textContent = '📅 ' + dayLabel + ' ' + times;
+    badge.style.color = '#FFD60A';
+  }
 }
+
+// ── 자동화 현황 / 다음 슬롯 계산 ────────────────────
+function getNextNewsSlotInfo(slots) {
+  var newsSlots = (slots || _scheduleSlots).filter(function(s){ return s.category === 'news'; });
+  if (!newsSlots.length) return null;
+  var now = new Date();
+  // KST 현재 시각 (UTC+9)
+  var kstOffMs = 9 * 3600 * 1000;
+  var kstNow = new Date(now.getTime() + kstOffMs);
+  var kstH   = kstNow.getUTCHours();
+  var kstMin = kstNow.getUTCMinutes();
+  var sorted = newsSlots.map(function(s){ return s.hour; }).sort(function(a,b){return a-b;});
+  // 오늘 중 아직 지나지 않은 슬롯 탐색
+  var todaySlot = null;
+  for (var i = 0; i < sorted.length; i++) {
+    if (sorted[i] > kstH || (sorted[i] === kstH && kstMin === 0)) {
+      todaySlot = sorted[i]; break;
+    }
+  }
+  var targetH  = todaySlot !== null ? todaySlot : sorted[0];
+  var dayLabel = todaySlot !== null ? '오늘' : '내일';
+  // 목표 시각 (KST ms)
+  var targetKst = new Date(kstNow);
+  targetKst.setUTCHours(targetH, 0, 0, 0);
+  if (dayLabel === '내일') targetKst.setUTCDate(targetKst.getUTCDate() + 1);
+  var diffMs = targetKst.getTime() - kstNow.getTime();
+  var diffH = Math.floor(diffMs / 3600000);
+  var diffM = Math.floor((diffMs % 3600000) / 60000);
+  var countdown = diffMs <= 0 ? '곧' : (diffH > 0 ? diffH + 'h ' + diffM + 'm 후' : diffM + 'm 후');
+  return {
+    kstH: targetH,
+    etH: kstToEt(targetH),
+    etLabel: isEDT() ? 'EDT' : 'EST',
+    dayLabel: dayLabel,
+    countdown: countdown
+  };
+}
+
+function updateAutoStatusCard() {
+  var el = document.getElementById('autoStatusBody');
+  if (!el) return;
+  var newsLine = '';
+  var newsSlots = _scheduleSlots.filter(function(s){ return s.category === 'news'; });
+  if (!_schedEnabled) {
+    newsLine = '<span style="color:#ef444488">자동화 꺼짐</span>';
+  } else if (!newsSlots.length) {
+    newsLine = '<span style="color:#555">슬롯 없음 — 수동 실행 필요</span>';
+  } else {
+    var info = getNextNewsSlotInfo(newsSlots);
+    if (info) {
+      var h   = String(info.kstH).padStart(2,'0');
+      var etH = String(info.etH).padStart(2,'0');
+      newsLine = '<span style="color:#ccc">' + info.dayLabel + ' ' + h + ':00 KST</span>'
+               + '<span style="color:#555;font-size:11px;margin-left:4px">(' + etH + ':00 ' + info.etLabel + ')</span>'
+               + '<span style="color:#FFD60A;font-size:11px;margin-left:6px;font-weight:700">— ' + info.countdown + '</span>';
+    }
+  }
+  var dayLbl = _scheduleDays === 'everyday' ? '매일'
+    : _scheduleDays === 'mon,tue,wed,thu,fri' ? '평일'
+    : _scheduleDays === 'sat,sun' ? '주말' : _scheduleDays;
+  el.innerHTML =
+    '<div style="display:grid;grid-template-columns:60px 1fr;gap:6px 8px;align-items:center">'
+    + '<span style="color:#666;font-size:11px">📰 뉴스</span>'
+    + '<span>' + (_schedEnabled ? '<span style="color:#555;font-size:10px">' + dayLbl + ' · </span>' : '') + newsLine + '</span>'
+    + '<span style="color:#666;font-size:11px">📚 커리큘럼</span>'
+    + '<span style="color:#555;font-size:11px">비활성화</span>'
+    + '</div>';
+}
+
+function updateQueuedNextTime() {
+  var el = document.getElementById('queuedNextTime');
+  if (!el) return;
+  var newsSlots = _scheduleSlots.filter(function(s){ return s.category === 'news'; });
+  if (!_schedEnabled || !newsSlots.length) {
+    el.textContent = _schedEnabled ? '⚡ 수동 실행 필요' : '자동화 꺼짐';
+    el.style.color = '#555';
+    return;
+  }
+  var info = getNextNewsSlotInfo(newsSlots);
+  if (!info) { el.textContent = ''; return; }
+  var h   = String(info.kstH).padStart(2,'0');
+  var etH = String(info.etH).padStart(2,'0');
+  el.innerHTML = '⏰ ' + info.dayLabel + ' <b style="color:#FFD60A">' + h + ':00 KST</b>'
+    + ' <span style="color:#555">(' + etH + ':00 ' + info.etLabel + ')</span>'
+    + ' <span style="color:#FFD60A">· ' + info.countdown + '</span>';
+}
+
+// 1분마다 자동화 현황 카운트다운 갱신
+setInterval(function() {
+  if (_schedEnabled) {
+    updateScheduleHeaderBadge(_schedEnabled, _scheduleDays, _scheduleSlots);
+    updateAutoStatusCard();
+    updateQueuedNextTime();
+  }
+}, 60000);
 
 // ── 탭 ───────────────────────────────────────────
 function showTab(n) {
+  if (n === 0 || n === 1 || n === 2) n = 3; // 숨겨진 탭 → 뉴스 탭으로 리다이렉트
   for (var i = 0; i < 6; i++) {
     document.getElementById('tabPane' + i).style.display = i === n ? 'block' : 'none';
     document.getElementById('tabBtn' + i).className = 'tab-btn' + (i === n ? ' active' : '');
@@ -1013,6 +1132,7 @@ async function loadQueuedNews() {
   var items = (res.data || []);
   if (!items.length) {
     el.innerHTML = '<div style="color:#444;font-size:12px;text-align:center;padding:14px">대기 중인 뉴스 없음</div>';
+    updateQueuedNextTime();
     return;
   }
   var html = '';
@@ -1031,6 +1151,7 @@ async function loadQueuedNews() {
     html += '</div></div>';
   });
   el.innerHTML = html;
+  updateQueuedNextTime();
 }
 
 async function queueNews(id) {
@@ -1707,10 +1828,10 @@ loadCfg();
 })();
 // 저장된 탭 복원
 (function() {
-  var savedTab = 0;
-  try { savedTab = parseInt(localStorage.getItem('ibbun_tab') || '1'); } catch(e) {}
-  if (isNaN(savedTab) || savedTab < 0 || savedTab > 4) savedTab = 1;
-  if (savedTab === 0) savedTab = 1; // 커리큘럼 비활성화 중
+  var savedTab = 3;
+  try { savedTab = parseInt(localStorage.getItem('ibbun_tab') || '3'); } catch(e) {}
+  if (isNaN(savedTab) || savedTab < 0 || savedTab > 5) savedTab = 3;
+  if (savedTab <= 2) savedTab = 3; // 탭 0/1/2 비활성화 → 뉴스 탭
   showTab(savedTab);
 })();
 if (cfg.url && cfg.key) {
