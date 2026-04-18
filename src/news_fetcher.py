@@ -65,22 +65,31 @@ def fetch_rss_items(max_per_feed: int = DEFAULT_MAX_PER_FEED,
         for source, url in RSS_FEEDS_BY_CATEGORY.get(cat, []):
             feeds.append((source, url, cat))
 
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)  # 24시간 이내만 허용
+
     items = []
     for source, url, cat in feeds:
         try:
             feed = feedparser.parse(url)
-            for entry in feed.entries[:max_per_feed]:
+            import re
+            accepted = 0
+            skipped  = 0
+            for entry in feed.entries[:max_per_feed * 3]:  # 넉넉히 읽고 날짜 필터 후 max_per_feed 채움
                 title   = entry.get('title', '').strip()
                 link    = entry.get('link', '').strip()
                 summary = entry.get('summary', entry.get('description', '')).strip()
-                # HTML 태그 간단 제거
-                import re
                 summary = re.sub(r'<[^>]+>', '', summary)[:500]
 
                 pub = entry.get('published_parsed') or entry.get('updated_parsed')
                 published_at = None
                 if pub:
-                    published_at = datetime(*pub[:6], tzinfo=timezone.utc).isoformat()
+                    pub_dt       = datetime(*pub[:6], tzinfo=timezone.utc)
+                    published_at = pub_dt.isoformat()
+                    # ── 24시간 초과 기사 제외 ──────────────────────
+                    if pub_dt < cutoff:
+                        skipped += 1
+                        continue
+                # published_at 없으면 날짜 미상 → 허용
 
                 if title and link:
                     items.append({
@@ -91,7 +100,14 @@ def fetch_rss_items(max_per_feed: int = DEFAULT_MAX_PER_FEED,
                         'published_at': published_at,
                         'category':     cat,
                     })
-            print(f'   [{source}] {len(feed.entries[:max_per_feed])}건 수집')
+                    accepted += 1
+                    if accepted >= max_per_feed:
+                        break
+
+            msg = f'   [{source}] {accepted}건 수집'
+            if skipped:
+                msg += f' ({skipped}건 오래된 기사 제외)'
+            print(msg)
         except Exception as e:
             print(f'   [{source}] 수집 실패: {e}')
     return items
