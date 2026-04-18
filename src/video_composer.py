@@ -2,7 +2,7 @@
 영상 합성:
 - Pillow로 각 세그먼트 프레임 합성 (검정 배경 + 노란 제목 + 이미지 + 흰 자막)
 - MoviePy로 프레임 + 오디오 → MP4
-- 나레이션 자막: 타이핑 효과 (문자가 하나씩 나타남)
+- 나레이션 자막: 타이핑 효과 (줄 단위로 한 글자씩 나타남)
 """
 import os
 import numpy as np
@@ -15,21 +15,25 @@ except ModuleNotFoundError:
     from moviepy import ImageSequenceClip, AudioFileClip, concatenate_videoclips
     MOVIEPY_V2 = True
 
-W, H   = 1080, 1920
-FPS    = 30
+W, H     = 1080, 1920
+FPS      = 30
 C_BLACK  = (0,   0,   0)
 C_YELLOW = (255, 214,  10)
 C_WHITE  = (255, 255, 255)
 
-TITLE_TOP    = 120
-IMG_Y        = 360
-IMG_SIZE     = 1080
+TITLE_TOP = 120
+IMG_Y     = 360
+IMG_SIZE  = 1080
 
-SUB_BG_ALPHA  = 160  # 자막 배경 박스 투명도 (0=완전투명, 255=불투명)
-SUB_BG_PAD    = 18   # 자막 배경 박스 여백(px)
-# YouTube Shorts 우측 버튼(좋아요/댓글/공유) 영역 약 130px 차지
-# 좌우 각 120px 여백을 두어 자막이 버튼에 가리지 않도록 제한
-SUB_MAX_WIDTH = W - 240  # 1080 - 240 = 840px
+SUB_BG_ALPHA  = 160   # 자막 배경 박스 투명도
+SUB_BG_PAD    = 18    # 자막 배경 박스 여백(px)
+# YouTube Shorts 우측 버튼 영역 ~130px → 좌우 120px 여백
+SUB_MAX_WIDTH = W - 240   # 840px
+
+# ── 자막 폰트 크기 후보 (큰 것부터 시도)
+SUB_FONT_SIZES = (62, 52, 44, 36)
+MAX_SUB_LINES  = 4    # 최대 자막 줄 수 (영어 긴 문장 대응)
+TYPING_SPEED   = 12   # chars/sec 기준 (실제 속도는 오디오 길이에 맞게 보정됨)
 
 
 def _get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
@@ -99,11 +103,40 @@ def _fit_title_font(draw, title: str, max_width: int,
     return _get_font(48, bold=True)
 
 
-# ── 베이스 프레임 (자막 제외) ─────────────────────────────────────
+def _auto_sub_font(narration: str) -> ImageFont.FreeTypeFont:
+    """나레이션이 MAX_SUB_LINES 이하로 줄바꿈되는 가장 큰 폰트 반환."""
+    tmp_draw = ImageDraw.Draw(Image.new('RGB', (10, 10)))
+    for size in SUB_FONT_SIZES:
+        font = _get_font(size, bold=True)
+        if len(_wrap_text(tmp_draw, narration, font, SUB_MAX_WIDTH)) <= MAX_SUB_LINES:
+            return font
+    return _get_font(SUB_FONT_SIZES[-1], bold=True)
 
-def _make_base(title: str, image_path: str) -> tuple:
+
+def _line_char_ranges(narration: str, lines: list) -> list:
+    """
+    각 줄의 (start_char, end_char) 위치를 narration 원문 기준으로 반환.
+    줄 사이 공백은 범위에 포함되지 않으므로, 타이핑 시 줄이 자연스럽게 이어짐.
+    """
+    result = []
+    pos = 0
+    for line in lines:
+        # 줄 사이 공백 건너뜀
+        while pos < len(narration) and narration[pos] in (' ', '\t', '\n', '\r'):
+            pos += 1
+        start = pos
+        end   = pos + len(line)
+        result.append((start, end))
+        pos = end
+    return result
+
+
+# ── 베이스 프레임 (자막 제외) ─────────────────────────────────────────
+
+def _make_base(title: str, image_path: str, narration: str = '') -> tuple:
     """
     자막 없이 제목 + 이미지만 렌더링.
+    narration을 받아 최적 폰트 크기 자동 선택.
     반환: (PIL Image, sub_font, line_h, sub_y, sub_bottom, pad)
     """
     pad   = 50
@@ -130,9 +163,12 @@ def _make_base(title: str, image_path: str) -> tuple:
     else:
         draw.rectangle([(0, img_y), (W, img_y + IMG_SIZE)], fill=C_BLACK)
 
-    # 자막 레이아웃 파라미터 계산 (실제 그리기는 안 함)
-    sub_font   = _get_font(62, bold=True)
-    line_h     = sub_font.getbbox('가')[3] + 14
+    # 자막 폰트: narration 기준 자동 크기 선택
+    sub_font = _auto_sub_font(narration) if narration else _get_font(62, bold=True)
+    # 라인 높이: 한글/영문 모두 커버하는 테스트 문자열 사용
+    _test_bb = sub_font.getbbox('Ag가')
+    line_h   = (_test_bb[3] - _test_bb[1]) + 14
+
     sub_top    = img_y + IMG_SIZE + 20
     sub_bottom = H - 80 - line_h
 
@@ -142,12 +178,12 @@ def _make_base(title: str, image_path: str) -> tuple:
 def _draw_subtitle(base_img: Image.Image, text: str,
                    sub_font, line_h: int, sub_top: int,
                    sub_bottom: int, pad: int) -> np.ndarray:
-    """베이스 이미지에 자막 text를 그린 numpy 배열 반환 (정적 프레임 / make_frame 용)."""
+    """베이스 이미지에 자막 text를 그린 numpy 배열 반환 (정적 프레임 용)."""
     img  = base_img.copy()
     draw = ImageDraw.Draw(img)
 
     if text:
-        lines   = _wrap_text(draw, text, sub_font, SUB_MAX_WIDTH)[:3]
+        lines   = _wrap_text(draw, text, sub_font, SUB_MAX_WIDTH)[:MAX_SUB_LINES]
         total_h = line_h * len(lines)
         y_start = max(sub_top, sub_bottom - total_h)
 
@@ -175,74 +211,86 @@ def _draw_subtitle(base_img: Image.Image, text: str,
     return np.array(img)
 
 
-TYPING_SPEED = 8    # 초당 타이핑 글자 수
-
-
-# ── 타이핑 효과 클립 생성 ─────────────────────────────────────────
+# ── 타이핑 효과 클립 생성 ─────────────────────────────────────────────
 
 def _make_subtitle_clip(title: str, image_path: str,
                         narration: str, audio_path: str):
     """
-    자막이 한 글자씩 타이핑되는 VideoClip 반환.
+    자막이 줄 단위로 한 글자씩 타이핑되는 VideoClip 반환.
 
-    핵심: 배경 박스 위치·크기와 텍스트 Y를 전체 나레이션 기준으로 미리 고정.
-    타이핑 중 박스가 늘어나거나 위치가 바뀌지 않는다.
+    개선점:
+    - _auto_sub_font: 나레이션 길이에 맞는 폰트 자동 선택 (문장 끊김 방지)
+    - _line_char_ranges: 각 줄의 원문 위치를 미리 계산 → 2번째 줄 갑작스러운 등장 방지
+    - 유효 타이핑 속도 보정: 오디오 85% 시점까지 모든 글자 완성 (속도 불일치·점프 방지)
     """
-    base_img, sub_font, line_h, sub_top, sub_bottom, pad = _make_base(title, image_path)
+    base_img, sub_font, line_h, sub_top, sub_bottom, pad = _make_base(
+        title, image_path, narration
+    )
     audio        = AudioFileClip(audio_path)
     duration     = audio.duration
     total_chars  = len(narration)
     total_frames = max(1, int(duration * FPS))
 
-    # ── 전체 나레이션 기준으로 레이아웃 고정 ──────────────────────
-    _ref_draw   = ImageDraw.Draw(base_img.copy())
-    full_lines  = _wrap_text(_ref_draw, narration, sub_font, SUB_MAX_WIDTH)[:3]
+    # ── 전체 나레이션 기준 레이아웃 고정 ──────────────────────────────
+    _ref_draw    = ImageDraw.Draw(base_img.copy())
+    full_lines   = _wrap_text(_ref_draw, narration, sub_font, SUB_MAX_WIDTH)[:MAX_SUB_LINES]
     full_n_lines = len(full_lines)
-    full_max_w   = max((_ref_draw.textlength(ln, font=sub_font) for ln in full_lines),
-                       default=0)
+    char_ranges  = _line_char_ranges(narration, full_lines)   # [(start, end), ...]
 
-    y_fixed   = max(sub_top, sub_bottom - line_h * full_n_lines)
-    box_w     = int(full_max_w) + SUB_BG_PAD * 2
-    box_h     = line_h * full_n_lines + SUB_BG_PAD * 2
-    box_x     = (W - box_w) // 2
-    box_y     = y_fixed - SUB_BG_PAD
+    full_max_w = max((_ref_draw.textlength(ln, font=sub_font) for ln in full_lines),
+                     default=0)
 
-    # 배경 박스가 그려진 베이스 이미지 1회만 합성
+    y_fixed = max(sub_top, sub_bottom - line_h * full_n_lines)
+    box_w   = int(full_max_w) + SUB_BG_PAD * 2
+    box_h   = line_h * full_n_lines + SUB_BG_PAD * 2
+    box_x   = (W - box_w) // 2
+    box_y   = y_fixed - SUB_BG_PAD
+
+    # 배경 박스 1회 합성
     overlay = Image.new('RGBA', base_img.size, (0, 0, 0, 0))
     ov_draw = ImageDraw.Draw(overlay)
     ov_draw.rounded_rectangle(
         [(box_x, box_y), (box_x + box_w, box_y + box_h)],
-        radius=12,
-        fill=(0, 0, 0, SUB_BG_ALPHA),
+        radius=12, fill=(0, 0, 0, SUB_BG_ALPHA),
     )
     base_with_box = Image.alpha_composite(
         base_img.convert('RGBA'), overlay
     ).convert('RGB')
 
-    # ── 자막 상태(글자 수) → numpy 배열 캐시 ───────────────────────
-    _cache: dict[int, np.ndarray] = {}
+    # ── 타이핑 속도 보정 ──────────────────────────────────────────────
+    # 기준 속도로 완료되는 시간 vs 오디오 85% 중 짧은 쪽
+    # → 유효 속도(eff_speed)를 역산하여 점프 없이 smooth하게 완성
+    natural_end = total_chars / TYPING_SPEED
+    typing_end  = min(natural_end, duration * 0.85)
+    eff_speed   = total_chars / typing_end if typing_end > 0 else float('inf')
+
+    # ── 자막 상태(글자 수) → numpy 배열 캐시 ─────────────────────────
+    _cache: dict = {}
 
     def get_arr(n: int) -> np.ndarray:
         if n not in _cache:
             img  = base_with_box.copy()
             draw = ImageDraw.Draw(img)
             if n:
-                lines = _wrap_text(draw, narration[:n], sub_font, SUB_MAX_WIDTH)[:3]
                 y = y_fixed
-                for line in lines:
-                    lw = draw.textlength(line, font=sub_font)
-                    draw.text(((W - lw) // 2, y), line, font=sub_font, fill=C_WHITE)
+                for line_text, (c_start, c_end) in zip(full_lines, char_ranges):
+                    if n < c_start:
+                        # 아직 이 줄에 도달하지 않음
+                        break
+                    # 이 줄에서 보여줄 글자 수 계산
+                    visible = line_text[:n - c_start] if n < c_end else line_text
+                    if visible:
+                        lw = draw.textlength(visible, font=sub_font)
+                        draw.text(((W - lw) // 2, y), visible,
+                                  font=sub_font, fill=C_WHITE)
                     y += line_h
             _cache[n] = np.array(img)
         return _cache[n]
 
-    # 타이핑 완료 시점: 전체 길이의 최대 50% 또는 타이핑 소요 시간
-    typing_end = min(total_chars / TYPING_SPEED, duration * 0.5)
-
     frames = []
     for i in range(total_frames):
         t = i / FPS
-        n = total_chars if t >= typing_end else min(int(t * TYPING_SPEED) + 1, total_chars)
+        n = total_chars if t >= typing_end else min(int(t * eff_speed) + 1, total_chars)
         frames.append(get_arr(n))
 
     clip = ImageSequenceClip(frames, fps=FPS)
@@ -251,17 +299,21 @@ def _make_subtitle_clip(title: str, image_path: str,
     else:
         clip = clip.set_audio(audio)
 
-    print(f'   [타이핑] "{narration[:20]}..." '
-          f'→ {total_chars}자 / {typing_end:.1f}s 내 완성 / 총 {duration:.1f}s')
+    font_size = sub_font.size if hasattr(sub_font, 'size') else '?'
+    print(f'   [타이핑] "{narration[:25]}..." '
+          f'| {total_chars}자 | 폰트 {font_size}px | {full_n_lines}줄 '
+          f'| {typing_end:.1f}s 내 완성 (속도 {eff_speed:.1f}cps) | 총 {duration:.1f}s')
     return clip
 
 
-# ── 공개 API ──────────────────────────────────────────────────────
+# ── 공개 API ──────────────────────────────────────────────────────────
 
 def make_frame(title: str, image_path: str, narration: str,
                frame_path: str) -> str:
     """단일 정적 프레임 PNG 저장 (하위 호환용)"""
-    base_img, sub_font, line_h, sub_top, sub_bottom, pad = _make_base(title, image_path)
+    base_img, sub_font, line_h, sub_top, sub_bottom, pad = _make_base(
+        title, image_path, narration
+    )
     arr = _draw_subtitle(base_img, narration, sub_font, line_h, sub_top, sub_bottom, pad)
     Image.fromarray(arr).save(frame_path)
     return frame_path
@@ -270,7 +322,7 @@ def make_frame(title: str, image_path: str, narration: str,
 def compose_video(segments_data: list, title: str, output_path: str) -> str:
     """
     segments_data: [{'audio_path': ..., 'narration': ..., 'image_path': ..., 'index': ...}]
-    타이핑 효과 자막으로 영상 합성
+    줄 단위 타이핑 자막으로 영상 합성
     """
     clips = []
     for seg in segments_data:

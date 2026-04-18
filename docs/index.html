@@ -263,7 +263,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 
     <!-- 헤더 -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="font-size:13px;font-weight:700;color:#FFD60A">📰 경제 뉴스 Shorts</div>
+      <div style="font-size:13px;font-weight:700;color:#FFD60A">수집 옵션</div>
       <div style="display:flex;gap:6px">
         <button onclick="deleteAllNews()"
           style="font-size:12px;padding:6px 12px;background:#ef444418;color:#ef4444;font-weight:600;border-radius:8px;border:1px solid #ef444440;cursor:pointer">
@@ -282,7 +282,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 
     <!-- 수집 옵션 -->
     <div class="card" style="margin-bottom:10px;padding:12px 14px">
-      <div style="font-size:11px;color:#888;margin-bottom:10px;font-weight:600">수집 옵션</div>
 
       <!-- 분야 선택 -->
       <div style="margin-bottom:10px">
@@ -307,18 +306,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
               style="width:14px;height:14px;cursor:pointer;accent-color:#FFD60A;margin-right:4px">
             낮음 관심도 수집 제외
           </label>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#ccc;cursor:pointer">
-            <input type="checkbox" id="newsRefreshEnabled"
-              style="width:14px;height:14px;cursor:pointer;accent-color:#FFD60A;margin-right:4px"
-              onchange="saveNewsSettings()">
-            뉴스 자동 새로고침
-          </label>
-          <input id="newsRefreshHours" type="number" min="1" max="72" value="3"
-            style="width:44px;background:#ffffff12;border:1px solid #ffffff25;border-radius:6px;color:#fff;font-size:12px;padding:3px 6px;text-align:center"
-            onchange="saveNewsSettings()">
-          <span style="font-size:12px;color:#aaa">시간마다 (전체 삭제 후 신규 수집)</span>
         </div>
       </div>
     </div>
@@ -1044,6 +1031,29 @@ setInterval(function() {
   }
 }, 60000);
 
+// 90분마다 뉴스 자동 수집 + 리스트 갱신 (예약 발행 기능과 독립)
+setInterval(async function() {
+  // RSS 수집 트리거 (silent — queued 항목은 news_fetch.py가 보존)
+  if (cfg && cfg.token && cfg.repo) {
+    var parts = cfg.repo.split('/');
+    fetch('https://api.github.com/repos/' + parts[0] + '/' + parts[1] +
+          '/actions/workflows/news_fetch.yml/dispatches', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + cfg.token,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ref: 'main' })
+    }).catch(function() {});
+    // 수집 완료(~2분) 후 UI 갱신
+    setTimeout(function() { loadNews(_newsFilter || 'all'); }, 120000);
+  } else {
+    // 토큰 미설정 시 DB에서 UI만 갱신
+    loadNews(_newsFilter || 'all');
+  }
+}, 90 * 60 * 1000);
+
 // ── 탭 ───────────────────────────────────────────
 function showTab(n) {
   if (n === 0 || n === 1 || n === 2) n = 3; // 숨겨진 탭 → 뉴스 탭으로 리다이렉트
@@ -1389,16 +1399,12 @@ function toggleNewsCategory(cat) {
 
 async function saveNewsSettings() {
   if (!sb) return;
-  var maxPerFeed      = document.getElementById('newsMaxPerFeed').value  || '5';
-  var skipLow         = document.getElementById('newsSkipLow').checked ? 'true' : 'false';
-  var refreshEnabled  = document.getElementById('newsRefreshEnabled').checked ? 'true' : 'false';
-  var refreshHours    = document.getElementById('newsRefreshHours').value || '3';
+  var maxPerFeed = document.getElementById('newsMaxPerFeed').value || '5';
+  var skipLow    = document.getElementById('newsSkipLow').checked ? 'true' : 'false';
   var pairs = [
-    { key: 'news_max_per_feed',     value: maxPerFeed },
-    { key: 'news_categories',       value: _selectedCategories.join(',') },
-    { key: 'news_skip_low',         value: skipLow },
-    { key: 'news_refresh_enabled',  value: refreshEnabled },
-    { key: 'news_refresh_hours',    value: refreshHours },
+    { key: 'news_max_per_feed', value: maxPerFeed },
+    { key: 'news_categories',   value: _selectedCategories.join(',') },
+    { key: 'news_skip_low',     value: skipLow },
   ];
   for (var p of pairs) {
     var exist = await sb.from('settings').select('key').eq('key', p.key);
@@ -1414,19 +1420,11 @@ async function saveNewsSettings() {
 async function loadNewsSettings() {
   if (!sb) return;
   var res = await sb.from('settings').select('key,value')
-    .in('key', ['news_max_per_feed','news_categories','news_skip_low','news_refresh_enabled','news_refresh_hours']);
+    .in('key', ['news_max_per_feed','news_categories','news_skip_low']);
   if (res.error || !res.data) { renderCategoryBtns(); renderCatFilterBtns(); return; }
   res.data.forEach(function(r) {
     if (r.key === 'news_max_per_feed') {
       var el = document.getElementById('newsMaxPerFeed');
-      if (el) el.value = r.value;
-    }
-    if (r.key === 'news_refresh_enabled') {
-      var el = document.getElementById('newsRefreshEnabled');
-      if (el) el.checked = r.value === 'true';
-    }
-    if (r.key === 'news_refresh_hours') {
-      var el = document.getElementById('newsRefreshHours');
       if (el) el.value = r.value;
     }
     if (r.key === 'news_categories' && r.value) {

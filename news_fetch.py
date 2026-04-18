@@ -14,14 +14,11 @@ def main():
     settings = get_news_settings()
     max_per_feed = int(settings.get('news_max_per_feed', 5))
 
-    # 자동 새로고침: 전체 삭제 후 신규 수집
-    refresh_enabled = settings.get('news_refresh_enabled', 'false').lower() == 'true'
-    if refresh_enabled:
-        from src.db_client import get_client
-        db = get_client()
-        db.table('news_items').delete() \
-          .neq('id', '00000000-0000-0000-0000-000000000000').execute()
-        print('🗑️ 기존 뉴스 전체 삭제 완료')
+    # pending 항목만 삭제 후 신규 수집 (queued 보존)
+    from src.db_client import get_client
+    db = get_client()
+    db.table('news_items').delete().eq('status', 'pending').execute()
+    print('🗑️ 기존 pending 뉴스 삭제 완료')
 
     print(f'   피드당 최대 {max_per_feed}건')
     items = fetch_rss_items(max_per_feed=max_per_feed)
