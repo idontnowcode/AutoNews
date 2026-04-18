@@ -59,16 +59,18 @@ def _is_in_schedule_window(settings: dict, category: str) -> bool:
         print(f'   ✅ 요일 조건 통과 (슬롯 미설정, 시간 무제한)')
         return True
 
-    # 시간 체크: GitHub Actions cron 지연 대비 90분 윈도우 허용
-    # 예: 2시 슬롯 → 2:00~3:29 KST 사이에 실행된 cron 모두 허용
+    # 시간 체크: 슬롯 90분 이전~정시 구간에서만 해당 슬롯 예약으로 실행
+    # 예) 2시 슬롯 → 0:30~2:00 KST 진입 시 "2시 예약"으로 실행
+    #     2:01~3:29 KST는 가까운 슬롯 없음 → 스킵
+    #     3:30~5:00 KST → "5시 예약"으로 실행
     WINDOW_MIN = 90
-    now_kst_min = (now.hour * 60 + now.minute + 9 * 60) % (24 * 60)  # 현재 KST 분 환산
+    now_kst_min = (now.hour * 60 + now.minute + 9 * 60) % (24 * 60)
 
     matched_hour = None
-    for h in hours_kst:
-        slot_min = h * 60
-        diff = (now_kst_min - slot_min) % (24 * 60)  # 슬롯 이후 경과 분
-        if diff <= WINDOW_MIN:
+    for h in sorted(hours_kst):
+        # 현재 시각에서 해당 슬롯까지 남은 분 (0 = 정시, 양수 = 슬롯 이전)
+        minutes_to_slot = (h * 60 - now_kst_min) % (24 * 60)
+        if minutes_to_slot <= WINDOW_MIN:
             matched_hour = h
             break
 
@@ -78,11 +80,11 @@ def _is_in_schedule_window(settings: dict, category: str) -> bool:
               f' (설정: {slots_kst_str}) — 건너뜁니다')
         return False
 
-    delay = (now_kst_min - matched_hour * 60) % (24 * 60)
-    if delay == 0:
-        print(f'   ✅ 스케줄 조건 통과 ({day_name}요일 {matched_hour}시 KST)')
+    minutes_to = (matched_hour * 60 - now_kst_min) % (24 * 60)
+    if minutes_to == 0:
+        print(f'   ✅ 스케줄 조건 통과 ({day_name}요일 {matched_hour}시 KST 정시)')
     else:
-        print(f'   ✅ 스케줄 조건 통과 ({day_name}요일 {matched_hour}시 KST, {delay}분 지연 허용)')
+        print(f'   ✅ 스케줄 조건 통과 ({day_name}요일 {matched_hour}시 KST 예약, {minutes_to}분 전 실행)')
     return True
 
 
