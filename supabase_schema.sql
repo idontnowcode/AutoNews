@@ -91,7 +91,32 @@ UPDATE topics SET prerequisites = ARRAY(
 ) WHERE title = 'PER과 PBR 읽는 법';
 
 -- ============================================================
--- 뉴스 관심도 컬럼 추가 (기존 DB에 실행)
+-- 뉴스 아이템 테이블
+-- ============================================================
+CREATE TABLE IF NOT EXISTS news_items (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title          TEXT NOT NULL,
+  url            TEXT UNIQUE NOT NULL,                    -- 중복 방지용 유니크 키
+  source         TEXT,                                    -- RSS 피드 출처명
+  summary        TEXT,                                    -- 기사 요약 (500자 이내)
+  status         TEXT DEFAULT 'pending'
+                 CHECK (status IN ('pending', 'queued', 'in_progress', 'done', 'failed')),
+  published_at   TIMESTAMPTZ,                             -- 기사 발행 시각
+  category       TEXT DEFAULT '경제',                    -- 분야 (경제/스포츠/IT 등)
+  interest_score INTEGER DEFAULT 0,                       -- 관심도 점수
+  interest_level TEXT DEFAULT 'medium'
+                 CHECK (interest_level IN ('low', 'medium', 'high')),
+  youtube_id     TEXT,                                    -- 업로드 완료 시 채워짐 (NULL = 미업로드)
+  created_at     TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 인덱스
+CREATE INDEX IF NOT EXISTS idx_news_status    ON news_items(status);
+CREATE INDEX IF NOT EXISTS idx_news_category  ON news_items(category);
+CREATE INDEX IF NOT EXISTS idx_news_published ON news_items(published_at DESC);
+
+-- ============================================================
+-- 뉴스 관심도 컬럼 추가 (기존 DB에 실행 — 이미 테이블 있을 경우)
 -- ============================================================
 ALTER TABLE news_items
   ADD COLUMN IF NOT EXISTS interest_score  INTEGER DEFAULT 0,
