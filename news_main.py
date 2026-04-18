@@ -11,7 +11,7 @@ from src.news_fetcher        import (fetch_rss_items, save_new_items, get_next_n
                                       get_next_high_interest_news, refresh_and_fetch_news,
                                       mark_news_in_progress, mark_news_done, mark_news_pending,
                                       mark_news_failed, delete_old_news, get_news_settings,
-                                      get_news_by_id)
+                                      get_news_by_id, auto_queue_top_news)
 from src.news_script_generator import generate_news_script
 from src.image_generator      import generate_all_images
 from src.tts_generator        import generate_segments_tts
@@ -56,12 +56,12 @@ def main():
         saved = save_new_items(items)
         print(f'   총 {len(items)}건 수집 / {saved}건 신규 저장')
 
-        # ── 1-1. 오래된 뉴스 자동 삭제 (일반 모드만) ─────
-        delete_days = int(news_settings.get('news_delete_days', 0))
-        if delete_days > 0:
-            deleted = delete_old_news(delete_days)
-            if deleted:
-                print(f'   🗑️  {delete_days}일 이상 된 뉴스 {deleted}건 삭제')
+    # ── 1-1. 오래된 done/failed 뉴스 자동 삭제 (모든 모드 공통) ─────
+    delete_days = int(news_settings.get('news_delete_days', 3))
+    if delete_days > 0:
+        deleted = delete_old_news(delete_days)
+        if deleted:
+            print(f'   🗑️  {delete_days}일 이상 된 뉴스 {deleted}건 삭제')
 
     news = None
 

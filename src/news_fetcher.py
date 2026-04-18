@@ -292,6 +292,40 @@ def get_next_high_interest_news() -> dict | None:
     return None
 
 
+def auto_queue_top_news() -> bool:
+    """
+    pending 중 interest_score 최고 뉴스 1건을 queued로 자동 등록.
+    이미 queued 항목이 있으면 스킵 (중복 방지).
+    반환: 등록 여부 (True=등록됨, False=스킵)
+    """
+    db = get_client()
+
+    # 이미 queued 항목이 있으면 추가 등록 불필요
+    existing = db.table('news_items').select('id').eq('status', 'queued').limit(1).execute()
+    if existing.data:
+        print('   ⏭️  이미 대기 큐에 항목 있음 — 자동 큐 등록 스킵')
+        return False
+
+    # high → medium 순으로 최고점 뉴스 1건 선택
+    for level in ('high', 'medium'):
+        res = (db.table('news_items')
+                 .select('id,title,interest_level,interest_score')
+                 .eq('status', 'pending')
+                 .eq('interest_level', level)
+                 .order('interest_score', desc=True)
+                 .order('published_at', desc=True)
+                 .limit(1)
+                 .execute())
+        if res.data:
+            item = res.data[0]
+            mark_news_queued(item['id'])
+            print(f'   🤖 자동 큐 등록: [{item["interest_level"]}|{item["interest_score"]}] '
+                  f'{item["title"][:45]}')
+            return True
+    print('   📭 자동 큐 등록할 pending 뉴스 없음')
+    return False
+
+
 def refresh_and_fetch_news(max_per_feed: int = 5, language: str = 'ko') -> int:
     """
     예약 발행 직전 호출:
