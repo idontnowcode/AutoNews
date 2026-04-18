@@ -167,6 +167,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
   <button class="tab-btn active" id="tabBtn3" onclick="showTab(3)">📰 뉴스</button>
   <button class="tab-btn" id="tabBtn4" onclick="showTab(4)">💰 비용</button>
   <button class="tab-btn" id="tabBtn5" onclick="showTab(5)">📊 리포트</button>
+  <button class="tab-btn" id="tabBtn6" onclick="showTab(6)">⚙️ 자동화</button>
 </div>
 
 <!-- 탭 0: 커리큘럼 -->
@@ -484,6 +485,93 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
   </div>
 </div>
 
+<!-- 탭 6: 자동화 설정 -->
+<div id="tabPane6" style="display:none">
+  <div style="padding:16px">
+
+    <!-- 예약 발행 카드 -->
+    <div class="card" style="padding:16px;margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px">📅 예약 발행</div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-size:14px;font-weight:600">예약 발행 활성화</div>
+          <div style="font-size:11px;color:#555;margin-top:2px">설정한 요일·시간에 자동 업로드</div>
+        </div>
+        <div style="position:relative;width:44px;height:24px;cursor:pointer" onclick="toggleScheduleSwitch()">
+          <input type="checkbox" id="cfgScheduleEnabled" style="display:none">
+          <span id="cfgScheduleToggle" style="position:absolute;inset:0;background:#ffffff20;border-radius:12px;transition:.2s">
+            <span id="cfgScheduleKnob" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.2s"></span>
+          </span>
+        </div>
+      </div>
+
+      <div id="cfgScheduleRow" style="display:none">
+        <!-- 요일 -->
+        <div style="margin-bottom:14px">
+          <label class="form-label">발행 요일</label>
+          <div style="display:flex;gap:5px;margin-bottom:6px;flex-wrap:wrap">
+            <button type="button" onclick="setScheduleDays('everyday')"
+              style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;cursor:pointer">매일</button>
+            <button type="button" onclick="setScheduleDays('mon,tue,wed,thu,fri')"
+              style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">평일</button>
+            <button type="button" onclick="setScheduleDays('mon,wed,fri')"
+              style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">월수금</button>
+            <button type="button" onclick="setScheduleDays('sat,sun')"
+              style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">주말</button>
+          </div>
+          <input id="cfgScheduleDays" class="form-input" type="text" value="everyday"
+            placeholder="everyday 또는 mon,tue,...">
+          <div style="font-size:11px;color:#555;margin-top:3px">everyday=매일 / mon 월 · tue 화 · wed 수 · thu 목 · fri 금 · sat 토 · sun 일</div>
+        </div>
+
+        <!-- 시간 슬롯 추가 -->
+        <div style="margin-bottom:8px">
+          <label class="form-label">발행 시간 · 콘텐츠 추가</label>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+            <input id="newSlotHour" type="number" min="0" max="23" value="20"
+              oninput="updateEstHint(this.value)"
+              style="width:58px;background:#ffffff12;border:1px solid #ffffff25;border-radius:6px;color:#fff;font-size:13px;padding:5px 8px;text-align:center">
+            <span style="font-size:12px;color:#777">시 (KST)</span>
+            <span id="estHint" style="font-size:11px;color:#555"></span>
+            <select id="newSlotCategory"
+              style="background:#1a1a1a;border:1px solid #ffffff25;border-radius:6px;color:#fff;font-size:12px;padding:5px 8px;cursor:pointer">
+              <option value="news">📰 뉴스</option>
+              <option value="curriculum">📚 커리큘럼</option>
+            </select>
+            <button type="button" onclick="addScheduleSlot()"
+              style="padding:5px 14px;background:#FFD60A;color:#000;font-weight:700;font-size:14px;border:none;border-radius:6px;cursor:pointer">+</button>
+          </div>
+          <div id="scheduleSlotList"></div>
+        </div>
+      </div>
+
+      <button onclick="saveAutoSettings(); toast('✅ 예약 발행 설정 저장됨')" class="btn-primary" style="margin-top:8px">💾 예약 발행 저장</button>
+    </div>
+
+    <!-- 콘텐츠 언어 카드 -->
+    <div class="card" style="padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">🌐 콘텐츠 언어</div>
+      <div style="font-size:12px;color:#666;margin-bottom:14px;line-height:1.6">
+        업로드될 YouTube 영상의 언어를 선택합니다.<br>
+        <span style="font-size:11px;color:#444">스크립트 · TTS 음성 · YouTube 채널이 함께 전환됩니다.</span>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:10px">
+        <button id="langTabBtnKo" onclick="setContentLang('ko')"
+          style="flex:1;padding:14px;border-radius:10px;border:2px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;font-weight:700;font-size:15px;cursor:pointer;transition:all .15s">
+          🇰🇷 한국어
+        </button>
+        <button id="langTabBtnEn" onclick="setContentLang('en')"
+          style="flex:1;padding:14px;border-radius:10px;border:2px solid #ffffff20;background:transparent;color:#555;font-weight:700;font-size:15px;cursor:pointer;transition:all .15s">
+          🇺🇸 English
+        </button>
+      </div>
+      <div style="font-size:11px;color:#555;text-align:center">현재 설정: <span id="langTabCurrent" style="color:#FFD60A;font-weight:700">한국어</span></div>
+    </div>
+
+  </div>
+</div>
+
 <!-- 모달 -->
 <div class="modal-overlay" id="modal" onclick="overlayClick(event)">
   <div class="modal-box">
@@ -510,62 +598,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
       <input id="cfgRepo" class="form-input" type="text" placeholder="username/repo">
     </div>
 
-    <!-- 예약 발행 설정 구분선 -->
     <div style="border-top:1px solid #ffffff15;margin:16px 0 14px"></div>
-    <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">📅 예약 발행</div>
-
-    <div class="form-group" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div>
-        <div style="font-size:14px;font-weight:600">예약 발행 활성화</div>
-        <div style="font-size:11px;color:#555;margin-top:2px">설정한 요일·시간에 YouTube 예약 업로드</div>
-      </div>
-      <div style="position:relative;width:44px;height:24px;cursor:pointer" onclick="toggleScheduleSwitch()">
-        <input type="checkbox" id="cfgScheduleEnabled" style="display:none">
-        <span id="cfgScheduleToggle" style="position:absolute;inset:0;background:#ffffff20;border-radius:12px;transition:.2s">
-          <span id="cfgScheduleKnob" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#888;border-radius:50%;transition:.2s"></span>
-        </span>
-      </div>
-    </div>
-
-    <div id="cfgScheduleRow" style="display:none">
-      <!-- 요일 -->
-      <div class="form-group" style="margin-bottom:12px">
-        <label class="form-label">발행 요일</label>
-        <div style="display:flex;gap:5px;margin-bottom:6px;flex-wrap:wrap">
-          <button type="button" onclick="setScheduleDays('everyday')"
-            style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;cursor:pointer">매일</button>
-          <button type="button" onclick="setScheduleDays('mon,tue,wed,thu,fri')"
-            style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">평일</button>
-          <button type="button" onclick="setScheduleDays('mon,wed,fri')"
-            style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">월수금</button>
-          <button type="button" onclick="setScheduleDays('sat,sun')"
-            style="font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid #ffffff20;background:transparent;color:#888;cursor:pointer">주말</button>
-        </div>
-        <input id="cfgScheduleDays" class="form-input" type="text" value="everyday"
-          placeholder="everyday 또는 mon,tue,...">
-        <div style="font-size:11px;color:#555;margin-top:3px">everyday=매일 / mon 월 · tue 화 · wed 수 · thu 목 · fri 금 · sat 토 · sun 일</div>
-      </div>
-
-      <!-- 시간+카테고리 슬롯 추가 -->
-      <div class="form-group">
-        <label class="form-label">발행 시간 · 콘텐츠 추가</label>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
-          <input id="newSlotHour" type="number" min="0" max="23" value="20"
-            oninput="updateEstHint(this.value)"
-            style="width:58px;background:#ffffff12;border:1px solid #ffffff25;border-radius:6px;color:#fff;font-size:13px;padding:5px 8px;text-align:center">
-          <span style="font-size:12px;color:#777">시 (KST)</span>
-          <span id="estHint" style="font-size:11px;color:#555"></span>
-          <select id="newSlotCategory"
-            style="background:#1a1a1a;border:1px solid #ffffff25;border-radius:6px;color:#fff;font-size:12px;padding:5px 8px;cursor:pointer">
-            <option value="news">📰 뉴스</option>
-            <option value="curriculum">📚 커리큘럼</option>
-          </select>
-          <button type="button" onclick="addScheduleSlot()"
-            style="padding:5px 14px;background:#FFD60A;color:#000;font-weight:700;font-size:14px;border:none;border-radius:6px;cursor:pointer">+</button>
-        </div>
-        <!-- 추가된 슬롯 목록 -->
-        <div id="scheduleSlotList"></div>
-      </div>
+    <div style="font-size:11px;color:#555;text-align:center">
+      예약 발행 · 언어 설정은 <button onclick="closeModal();showTab(6)" style="color:#FFD60A;font-weight:700;font-size:11px;background:none;border:none;cursor:pointer;text-decoration:underline">⚙️ 자동화 탭</button>에서 설정하세요
     </div>
 
     <div class="modal-footer">
@@ -622,18 +657,35 @@ var _contentLang = 'ko';
 var _langSaveTimer = null;
 function setContentLang(lang, skipSave) {
   _contentLang = lang;
+  // ── 헤더 pill 버튼 ───────────────────────────────
   var ko = document.getElementById('langBtnKo');
   var en = document.getElementById('langBtnEn');
-  if (!ko || !en) return;
-  var base = 'font-size:12px;padding:4px 11px;border-radius:20px;font-weight:700;cursor:pointer;transition:all .15s;';
-  if (lang === 'ko') {
-    ko.style.cssText = base + 'border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;';
-    en.style.cssText = base + 'border:1px solid #ffffff20;background:transparent;color:#555;';
-  } else {
-    en.style.cssText = base + 'border:1px solid #4f9eff55;background:#4f9eff22;color:#4f9eff;';
-    ko.style.cssText = base + 'border:1px solid #ffffff20;background:transparent;color:#555;';
+  if (ko && en) {
+    var base = 'font-size:12px;padding:4px 11px;border-radius:20px;font-weight:700;cursor:pointer;transition:all .15s;';
+    if (lang === 'ko') {
+      ko.style.cssText = base + 'border:1px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;';
+      en.style.cssText = base + 'border:1px solid #ffffff20;background:transparent;color:#555;';
+    } else {
+      en.style.cssText = base + 'border:1px solid #4f9eff55;background:#4f9eff22;color:#4f9eff;';
+      ko.style.cssText = base + 'border:1px solid #ffffff20;background:transparent;color:#555;';
+    }
   }
-  // Supabase에 자동 저장 (debounce 500ms)
+  // ── 자동화 탭 언어 버튼 ──────────────────────────
+  var tabKo  = document.getElementById('langTabBtnKo');
+  var tabEn  = document.getElementById('langTabBtnEn');
+  var tabCur = document.getElementById('langTabCurrent');
+  var tabBase = 'flex:1;padding:14px;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer;transition:all .15s;';
+  if (tabKo && tabEn) {
+    if (lang === 'ko') {
+      tabKo.style.cssText = tabBase + 'border:2px solid #FFD60A55;background:#FFD60A22;color:#FFD60A;';
+      tabEn.style.cssText = tabBase + 'border:2px solid #ffffff20;background:transparent;color:#555;';
+    } else {
+      tabEn.style.cssText = tabBase + 'border:2px solid #4f9eff55;background:#4f9eff22;color:#4f9eff;';
+      tabKo.style.cssText = tabBase + 'border:2px solid #ffffff20;background:transparent;color:#555;';
+    }
+  }
+  if (tabCur) tabCur.textContent = lang === 'ko' ? '한국어' : 'English';
+  // ── Supabase 자동 저장 (debounce 500ms) ──────────
   if (!skipSave && sb) {
     clearTimeout(_langSaveTimer);
     _langSaveTimer = setTimeout(function() {
@@ -699,8 +751,6 @@ function openModal() {
   document.getElementById('cfgToken').value = cfg.token || '';
   document.getElementById('cfgRepo').value  = cfg.repo  || '';
   document.getElementById('modal').style.display = 'flex';
-  // 자동 업로드 설정 불러오기
-  if (sb) loadAutoSettings();
 }
 
 // ── 예약 발행 설정 ────────────────────────────────
@@ -799,7 +849,12 @@ async function saveAutoSettings() {
   for (var i = 0; i < rows.length; i++) {
     await sb.from('settings').upsert(rows[i], { onConflict: 'key' });
   }
+  // 전역 상태 갱신 → 헤더·자동화 현황 즉시 반영
+  _schedEnabled = schedEnabled;
+  _scheduleDays = schedDays;
   updateScheduleHeaderBadge(schedEnabled, schedDays, _scheduleSlots);
+  updateAutoStatusCard();
+  updateQueuedNextTime();
 }
 function closeModal() {
   document.getElementById('modal').style.display = 'none';
@@ -951,13 +1006,16 @@ setInterval(function() {
 // ── 탭 ───────────────────────────────────────────
 function showTab(n) {
   if (n === 0 || n === 1 || n === 2) n = 3; // 숨겨진 탭 → 뉴스 탭으로 리다이렉트
-  for (var i = 0; i < 6; i++) {
-    document.getElementById('tabPane' + i).style.display = i === n ? 'block' : 'none';
-    document.getElementById('tabBtn' + i).className = 'tab-btn' + (i === n ? ' active' : '');
+  for (var i = 0; i < 7; i++) {
+    var pane = document.getElementById('tabPane' + i);
+    var btn  = document.getElementById('tabBtn'  + i);
+    if (pane) pane.style.display = i === n ? 'block' : 'none';
+    if (btn)  btn.className = 'tab-btn' + (i === n ? ' active' : '');
   }
   if (n === 3) { loadNews('all'); loadQueuedNews(); loadInProgressNews(); }
   if (n === 4) loadCostStats();
   if (n === 5) loadReportList();
+  if (n === 6) { if (sb) loadAutoSettings(); }
   try { localStorage.setItem('ibbun_tab', n); } catch(e) {}
 }
 
@@ -1830,7 +1888,7 @@ loadCfg();
 (function() {
   var savedTab = 3;
   try { savedTab = parseInt(localStorage.getItem('ibbun_tab') || '3'); } catch(e) {}
-  if (isNaN(savedTab) || savedTab < 0 || savedTab > 5) savedTab = 3;
+  if (isNaN(savedTab) || savedTab < 0 || savedTab > 6) savedTab = 3;
   if (savedTab <= 2) savedTab = 3; // 탭 0/1/2 비활성화 → 뉴스 탭
   showTab(savedTab);
 })();
