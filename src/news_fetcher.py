@@ -1,13 +1,14 @@
 """
-RSS 피드에서 경제 뉴스 수집 → Supabase news_items 저장
+RSS 피드에서 뉴스 수집 → Supabase news_items 저장
+content_language 설정에 따라 한국어(KO) 또는 해외(EN) 피드 자동 선택
 """
 import os
 from datetime import datetime, timezone, timedelta
 import feedparser
 from src.db_client import get_client
 
-# ── RSS 피드 목록 (분야별) ────────────────────────────────
-RSS_FEEDS_BY_CATEGORY = {
+# ── 국내 언론사 피드 (content_language='ko') ───────────────
+RSS_FEEDS_KO = {
     '경제': [
         ('연합뉴스 경제',  'https://www.yna.co.kr/rss/economy.xml'),
         ('매일경제',       'https://www.mk.co.kr/rss/40300001/'),
@@ -38,6 +39,42 @@ RSS_FEEDS_BY_CATEGORY = {
     ],
 }
 
+# ── 해외 언론사 피드 (content_language='en') ───────────────
+RSS_FEEDS_EN = {
+    '경제': [
+        ('Yahoo Finance',      'https://finance.yahoo.com/news/rssindex'),
+        ('CNBC Economy',       'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664'),
+        ('Google News Economy','https://news.google.com/rss/search?q=economy+finance+market+stocks&hl=en&gl=US&ceid=US:en'),
+        ('Google News Fed',    'https://news.google.com/rss/search?q=Federal+Reserve+interest+rate+inflation&hl=en&gl=US&ceid=US:en'),
+    ],
+    'IT/테크': [
+        ('TechCrunch',         'https://techcrunch.com/feed/'),
+        ('The Verge',          'https://www.theverge.com/rss/index.xml'),
+        ('Google News AI',     'https://news.google.com/rss/search?q=artificial+intelligence+AI+tech+Apple+Google&hl=en&gl=US&ceid=US:en'),
+    ],
+    '스포츠': [
+        ('BBC Sport',          'https://feeds.bbci.co.uk/sport/rss.xml'),
+        ('Google News Sports', 'https://news.google.com/rss/search?q=sports+NFL+NBA+MLB+soccer+transfer&hl=en&gl=US&ceid=US:en'),
+    ],
+    '정치': [
+        ('Politico',           'https://www.politico.com/rss/politicopicks.xml'),
+        ('Google News Politics','https://news.google.com/rss/search?q=US+politics+policy+Trump+Congress&hl=en&gl=US&ceid=US:en'),
+    ],
+    '사회': [
+        ('BBC News',           'https://feeds.bbci.co.uk/news/rss.xml'),
+        ('NPR News',           'https://feeds.npr.org/1001/rss.xml'),
+        ('Google News Society','https://news.google.com/rss/search?q=social+issues+health+climate+society&hl=en&gl=US&ceid=US:en'),
+    ],
+    '국제': [
+        ('BBC World',          'https://feeds.bbci.co.uk/news/world/rss.xml'),
+        ('The Guardian World', 'https://www.theguardian.com/world/rss'),
+        ('Google News World',  'https://news.google.com/rss/search?q=world+news+international+geopolitics&hl=en&gl=US&ceid=US:en'),
+    ],
+}
+
+# 하위 호환: 기존 코드가 RSS_FEEDS_BY_CATEGORY를 직접 참조하는 경우 대비
+RSS_FEEDS_BY_CATEGORY = RSS_FEEDS_KO
+
 DEFAULT_MAX_PER_FEED = 5
 
 
@@ -52,17 +89,26 @@ def get_news_settings() -> dict:
 
 
 def fetch_rss_items(max_per_feed: int = DEFAULT_MAX_PER_FEED,
-                    categories: list[str] | None = None) -> list[dict]:
-    """RSS 피드에서 뉴스 수집. categories=None이면 설정된 분야만 수집"""
+                    categories: list[str] | None = None,
+                    language: str = 'ko') -> list[dict]:
+    """
+    RSS 피드에서 뉴스 수집.
+    language='ko' → 국내 언론사(RSS_FEEDS_KO)
+    language='en' → 해외 언론사(RSS_FEEDS_EN)
+    categories=None이면 settings의 news_categories 사용
+    """
     if categories is None:
-        # settings에서 활성화된 분야 읽기
         settings = get_news_settings()
         raw = settings.get('news_categories', '경제')
         categories = [c.strip() for c in raw.split(',') if c.strip()]
 
+    feed_map = RSS_FEEDS_EN if language == 'en' else RSS_FEEDS_KO
+    lang_label = '🌐 해외' if language == 'en' else '🇰🇷 국내'
+    print(f'   {lang_label} 피드 선택 (language={language})')
+
     feeds = []
     for cat in categories:
-        for source, url in RSS_FEEDS_BY_CATEGORY.get(cat, []):
+        for source, url in feed_map.get(cat, []):
             feeds.append((source, url, cat))
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=24)  # 24시간 이내만 허용
@@ -246,16 +292,17 @@ def get_next_high_interest_news() -> dict | None:
     return None
 
 
-def refresh_and_fetch_news(max_per_feed: int = 5) -> int:
+def refresh_and_fetch_news(max_per_feed: int = 5, language: str = 'ko') -> int:
     """
     예약 발행 직전 호출:
     기존 pending 뉴스를 모두 삭제하고 RSS에서 최신 뉴스를 새로 수집·저장.
+    language에 따라 국내/해외 피드 자동 선택. queued 항목은 보존.
     저장된 건수 반환.
     """
     db = get_client()
     db.table('news_items').delete().eq('status', 'pending').execute()
     print('   🗑️  기존 pending 뉴스 삭제 완료')
-    items = fetch_rss_items(max_per_feed=max_per_feed)
+    items = fetch_rss_items(max_per_feed=max_per_feed, language=language)
     saved = save_new_items(items)
     print(f'   📰 최신 뉴스 {len(items)}건 수집 / {saved}건 저장')
     return saved

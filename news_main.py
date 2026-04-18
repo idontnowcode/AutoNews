@@ -49,10 +49,10 @@ def main():
     elif schedule_on:
         # 예약 발행 모드: pending 뉴스 전체 삭제 후 최신 뉴스 재수집
         print('🔄 예약 발행 모드: 최신 뉴스 실시간 수집 중...')
-        refresh_and_fetch_news(max_per_feed=max_per_feed)
+        refresh_and_fetch_news(max_per_feed=max_per_feed, language=language)
     else:
         print('📰 뉴스 RSS 수집 중...')
-        items = fetch_rss_items(max_per_feed=max_per_feed)
+        items = fetch_rss_items(max_per_feed=max_per_feed, language=language)
         saved = save_new_items(items)
         print(f'   총 {len(items)}건 수집 / {saved}건 신규 저장')
 
