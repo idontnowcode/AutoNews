@@ -136,3 +136,42 @@ def get_content_language() -> str:
         return lang if lang in ('ko', 'en') else 'ko'
     except Exception:
         return 'ko'
+
+
+def get_scheduled_language(category: str = 'news') -> str:
+    """
+    예약 실행 시 사용할 언어 결정:
+      현재 시각에 매칭되는 슬롯의 lang 필드 반환.
+      슬롯에 lang 없으면 전역 content_language 설정 사용.
+    """
+    try:
+        settings = get_settings()
+    except Exception:
+        return 'ko'
+
+    slots_raw = settings.get('upload_schedule_slots', '[]')
+    try:
+        slots = json.loads(slots_raw) if slots_raw else []
+    except Exception:
+        slots = []
+
+    WINDOW_MIN = 90
+    now = datetime.now(timezone.utc)
+    now_kst_min = (now.hour * 60 + now.minute + 9 * 60) % (24 * 60)
+
+    cat_slots = [s for s in slots if s.get('category') == category]
+    for s in sorted(cat_slots, key=lambda x: x.get('hour', 0)):
+        h = s.get('hour')
+        if h is None:
+            continue
+        minutes_to_slot = (h * 60 - now_kst_min) % (24 * 60)
+        if minutes_to_slot <= WINDOW_MIN:
+            slot_lang = s.get('lang', '').lower().strip()
+            if slot_lang in ('ko', 'en'):
+                print(f'   🌐 슬롯 언어 사용: {slot_lang.upper()} (슬롯 {h}시)')
+                return slot_lang
+            break  # 매칭됐지만 lang 없음 → 전역 설정 사용
+
+    # 매칭 슬롯 lang 없음 → 전역 content_language
+    lang = settings.get('content_language', 'ko').lower().strip()
+    return lang if lang in ('ko', 'en') else 'ko'

@@ -17,7 +17,7 @@ from src.image_generator      import generate_all_images
 from src.tts_generator        import generate_segments_tts
 from src.video_composer       import compose_video
 from src.youtube_uploader     import upload_shorts, get_next_optimal_time
-from src.settings_manager     import check_news_should_run, get_settings, get_content_language
+from src.settings_manager     import check_news_should_run, get_settings, get_content_language, get_scheduled_language
 
 load_dotenv()
 
@@ -28,16 +28,21 @@ def main():
         sys.exit(0)
 
     settings     = get_settings()
-    language     = get_content_language()
+    news_settings = get_news_settings()
+    max_per_feed  = int(news_settings.get('news_max_per_feed', 5))
+    schedule_on   = settings.get('upload_schedule_enabled', 'false').lower() == 'true'
+
+    # 언어 결정: 예약 모드 → 매칭 슬롯 lang 우선 / 수동 → 전역 content_language
+    if schedule_on:
+        language = get_scheduled_language('news')
+    else:
+        language = get_content_language()
+
     ts           = datetime.now().strftime('%Y%m%d_%H%M%S')
     work_dir     = f'output/news_{ts}'
     os.makedirs(work_dir, exist_ok=True)
     lang_flag = '🇺🇸' if language == 'en' else '🇰🇷'
     print(f'{lang_flag} 콘텐츠 언어: {language.upper()}')
-
-    news_settings = get_news_settings()
-    max_per_feed  = int(news_settings.get('news_max_per_feed', 5))
-    schedule_on   = settings.get('upload_schedule_enabled', 'false').lower() == 'true'
 
     # NEWS_ID 지정 여부를 먼저 확인 — 있으면 RSS 수집/삭제 전체 건너뜀
     news_id_override = os.environ.get('NEWS_ID', '').strip()
