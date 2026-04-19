@@ -3,6 +3,7 @@
 """
 import os
 import json
+from datetime import datetime, timezone
 import anthropic
 from src.db_client import get_client
 
@@ -78,7 +79,7 @@ def save_video(topic_id: str, youtube_id: str, script: dict, slide_prompts: list
         'narration':    script.get('narration', ''),
         'script_json':  script,
         'slide_prompts': slide_prompts,
-        'published_at': 'NOW()',
+        'published_at': datetime.now(timezone.utc).isoformat(),
     }).execute()
 
 

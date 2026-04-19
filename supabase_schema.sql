@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS topics (
   prerequisites UUID[] DEFAULT '{}',                   -- 선행 주제 ID 배열
   related_topics UUID[] DEFAULT '{}',                  -- 연관 주제 ID 배열
   status        TEXT DEFAULT 'pending'
-                CHECK (status IN ('pending', 'in_progress', 'done')),
+                CHECK (status IN ('pending', 'in_progress', 'done', 'failed')),
   order_index   INTEGER,                               -- 커리큘럼 순서
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
@@ -201,3 +201,11 @@ CREATE TABLE IF NOT EXISTS pipeline_logs (
 CREATE INDEX IF NOT EXISTS idx_pipeline_logs_created  ON pipeline_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_pipeline_logs_level    ON pipeline_logs(level, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_pipeline_logs_pipeline ON pipeline_logs(pipeline, created_at DESC);
+
+-- ============================================================
+-- 기존 DB 마이그레이션 — topics.status에 'failed' 추가
+-- 이미 CREATE TABLE을 실행한 DB에서만 필요
+-- ============================================================
+ALTER TABLE topics DROP CONSTRAINT IF EXISTS topics_status_check;
+ALTER TABLE topics ADD CONSTRAINT topics_status_check
+  CHECK (status IN ('pending', 'in_progress', 'done', 'failed'));
