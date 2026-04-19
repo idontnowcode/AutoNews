@@ -121,7 +121,12 @@ def main():
         print('📤 YouTube 업로드 중...')
         try:
             publish_at = None
-            if news_id_override:
+            publish_at_override = os.environ.get('PUBLISH_AT', '').strip()
+            if publish_at_override:
+                # PUBLISH_AT 환경변수 직접 지정 (수동 예약 발행)
+                publish_at = publish_at_override
+                print(f'   📅 수동 예약 발행: {publish_at} (UTC)')
+            elif news_id_override:
                 # 수동 진행 버튼 → 예약 없이 즉시 공개
                 print('   ⚡ 수동 실행 — 즉시 공개 업로드')
             elif settings.get('upload_schedule_enabled', 'false').lower() == 'true':

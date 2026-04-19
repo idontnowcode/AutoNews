@@ -9,6 +9,10 @@ on:
         description: '처리할 뉴스 ID (없으면 자동 선택)'
         required: false
         default: ''
+      publish_at:
+        description: '예약 발행 시각 — UTC ISO 8601 (예: 2026-04-19T14:30:00Z). 비워두면 즉시 공개'
+        required: false
+        default: ''
 
 jobs:
   news-create-and-upload:
@@ -57,6 +61,7 @@ jobs:
           YOUTUBE_TOKEN_EN:    ${{ secrets.YOUTUBE_TOKEN_EN }}
           FORCE_RUN:           ${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}
           NEWS_ID:             ${{ github.event.inputs.news_id }}
+          PUBLISH_AT:          ${{ github.event.inputs.publish_at }}
         run: python news_main.py
 
       - name: 결과물 보관 (3일)
