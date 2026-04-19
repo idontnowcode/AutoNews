@@ -168,6 +168,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
   <button class="tab-btn" id="tabBtn4" onclick="showTab(4)">💰 비용</button>
   <button class="tab-btn" id="tabBtn5" onclick="showTab(5)">📊 리포트</button>
   <button class="tab-btn" id="tabBtn6" onclick="showTab(6)">⚙️ 자동화</button>
+  <button class="tab-btn" id="tabBtn7" onclick="showTab(7)" style="position:relative">🔔 로그<span id="logErrBadge" style="display:none;position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:#ef4444"></span></button>
 </div>
 
 <!-- 탭 0: 커리큘럼 -->
@@ -561,6 +562,35 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
   </div>
 </div>
 
+<!-- 탭 7: 파이프라인 로그 -->
+<div id="tabPane7" style="display:none">
+  <div style="padding:16px">
+
+    <!-- 헤더 -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px">🔔 파이프라인 로그</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <select id="logFilter" onchange="loadPipelineLogs()" style="font-size:11px;padding:4px 8px;background:#ffffff0a;border:1px solid #ffffff15;border-radius:6px;color:#aaa">
+          <option value="all">전체</option>
+          <option value="error">오류만</option>
+          <option value="warning">경고만</option>
+          <option value="success">성공만</option>
+        </select>
+        <button onclick="clearOldLogs()" style="font-size:10px;padding:4px 10px;background:#ffffff08;border:1px solid #ffffff15;border-radius:6px;color:#666;cursor:pointer">🗑️ 30일 이전 삭제</button>
+      </div>
+    </div>
+
+    <!-- 오류 대응 가이드 (오류 있을 때만 표시) -->
+    <div id="logActionGuide" style="display:none;margin-bottom:12px"></div>
+
+    <!-- 로그 리스트 -->
+    <div id="logContainer">
+      <div style="color:#555;font-size:13px;text-align:center;padding:40px 0">로그를 불러오는 중...</div>
+    </div>
+
+  </div>
+</div>
+
 <!-- 모달 -->
 <div class="modal-overlay" id="modal" onclick="overlayClick(event)">
   <div class="modal-box">
@@ -710,6 +740,7 @@ function connect() {
       loadNews('all');
       loadQueuedNews();
       loadInProgressNews();
+      checkLogErrBadge();
       loadNewsSettings();
     } catch(e) {
       toast('연결 오류: ' + e.message);
@@ -1054,7 +1085,7 @@ setInterval(async function() {
 // ── 탭 ───────────────────────────────────────────
 function showTab(n) {
   if (n === 0 || n === 1 || n === 2) n = 3; // 숨겨진 탭 → 뉴스 탭으로 리다이렉트
-  for (var i = 0; i < 7; i++) {
+  for (var i = 0; i < 8; i++) {
     var pane = document.getElementById('tabPane' + i);
     var btn  = document.getElementById('tabBtn'  + i);
     if (pane) pane.style.display = i === n ? 'block' : 'none';
@@ -1064,6 +1095,7 @@ function showTab(n) {
   if (n === 4) loadCostStats();
   if (n === 5) loadReportList();
   if (n === 6) { if (sb) loadAutoSettings(); }
+  if (n === 7) { if (sb) loadPipelineLogs(); }
   try { localStorage.setItem('ibbun_tab', n); } catch(e) {}
 }
 
@@ -1920,11 +1952,118 @@ loadCfg();
     _genPollTimer = setTimeout(checkGenStatus, 5000);
   }
 })();
+// ── 파이프라인 로그 ───────────────────────────────
+var _LOG_ERROR_ACTIONS = {
+  api_limit:    { icon: '⚠️', label: 'API 한도 초과',        action: 'Claude API 일일 한도 도달. 뉴스/주제는 pending 복귀 — 내일 자동 재시도됩니다.' },
+  upload_limit: { icon: '🚫', label: 'YouTube 업로드 한도',  action: '일일 업로드 한도 초과. youtube.com/verify 방문 → 채널 인증 후 한도 해제' },
+  youtube_auth: { icon: '🔑', label: 'YouTube 인증 오류',    action: 'OAuth 토큰 만료. GitHub Secrets → YOUTUBE_TOKEN 갱신 필요 (채널 재인증)' },
+  image_gen:    { icon: '🎨', label: '이미지 생성 실패',     action: 'OpenAI API 키/크레딧 확인 → platform.openai.com/usage' },
+  tts:          { icon: '🎙️', label: 'TTS 생성 실패',        action: 'ElevenLabs API 키/크레딧 확인 → elevenlabs.io/subscription' },
+  script:       { icon: '✍️', label: '스크립트 생성 실패',   action: 'Anthropic API 키 확인 → console.anthropic.com/settings/keys' },
+  rss:          { icon: '📡', label: 'RSS 수집 실패',         action: '일시적 네트워크 오류. 다음 예약 실행 시 자동 재시도됩니다.' },
+  video:        { icon: '🎬', label: '영상 합성 실패',        action: 'FFmpeg/MoviePy 오류. GitHub Actions 상세 로그 확인 필요' },
+  unknown:      { icon: '❓', label: '알 수 없는 오류',       action: 'GitHub Actions 로그에서 상세 traceback 확인 필요' },
+};
+var _LEVEL_STYLE = {
+  error:   'border-left:3px solid #ef4444;background:#ef444408',
+  warning: 'border-left:3px solid #f59e0b;background:#f59e0b08',
+  success: 'border-left:3px solid #10b981;background:#10b98108',
+  info:    'border-left:3px solid #3b82f6;background:#3b82f608',
+};
+var _LEVEL_ICON  = { error:'❌', warning:'⚠️', success:'✅', info:'ℹ️' };
+
+async function loadPipelineLogs() {
+  if (!sb) return;
+  var el = document.getElementById('logContainer');
+  var filter = document.getElementById('logFilter') ? document.getElementById('logFilter').value : 'all';
+  el.innerHTML = '<div style="color:#555;font-size:13px;text-align:center;padding:30px">로딩 중...</div>';
+
+  var q = sb.from('pipeline_logs').select('*').order('created_at', {ascending: false}).limit(80);
+  if (filter !== 'all') q = q.eq('level', filter);
+
+  var res = await q;
+  var logs = (res.data || []);
+
+  // 오류 배지 갱신
+  var errCount = logs.filter(function(l){ return l.level === 'error'; }).length;
+  var badge = document.getElementById('logErrBadge');
+  if (badge) badge.style.display = errCount > 0 ? 'block' : 'none';
+
+  // 오류 대응 가이드 (미해결 오류 유형 추출)
+  var guideEl = document.getElementById('logActionGuide');
+  var errorTypes = {};
+  logs.filter(function(l){ return l.level === 'error' || l.level === 'warning'; })
+      .forEach(function(l){ if (l.error_type) errorTypes[l.error_type] = true; });
+  var typeKeys = Object.keys(errorTypes);
+  if (typeKeys.length > 0) {
+    guideEl.style.display = 'block';
+    guideEl.innerHTML = '<div class="card" style="border:1px solid #ef444430;background:#ef444408;padding:14px">'
+      + '<div style="font-size:11px;font-weight:700;color:#ef4444;margin-bottom:10px">🚨 발생한 오류 대응 방법</div>'
+      + typeKeys.map(function(t) {
+          var a = _LOG_ERROR_ACTIONS[t] || _LOG_ERROR_ACTIONS.unknown;
+          return '<div style="display:flex;gap:8px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #ffffff0a">'
+            + '<span style="font-size:14px;flex-shrink:0">' + a.icon + '</span>'
+            + '<div><div style="font-size:11px;font-weight:700;color:#ddd">' + a.label + '</div>'
+            + '<div style="font-size:11px;color:#888;margin-top:2px">' + a.action + '</div></div></div>';
+        }).join('')
+      + '</div>';
+  } else {
+    guideEl.style.display = 'none';
+  }
+
+  if (logs.length === 0) {
+    el.innerHTML = '<div style="color:#555;font-size:13px;text-align:center;padding:40px">로그 없음</div>';
+    return;
+  }
+
+  el.innerHTML = logs.map(function(log) {
+    var style = _LEVEL_STYLE[log.level] || _LEVEL_STYLE.info;
+    var icon  = _LEVEL_ICON[log.level] || 'ℹ️';
+    var dt    = new Date(log.created_at);
+    var dtStr = dt.toLocaleString('ko-KR', {timeZone:'Asia/Seoul', month:'2-digit', day:'2-digit',
+                  hour:'2-digit', minute:'2-digit', hour12:false});
+    var pipeLabel = log.pipeline === 'news' ? '📰 뉴스' : '📚 커리큘럼';
+    var errInfo   = '';
+    if (log.error_type) {
+      var a = _LOG_ERROR_ACTIONS[log.error_type] || _LOG_ERROR_ACTIONS.unknown;
+      errInfo = '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#ffffff10;color:#aaa;margin-left:6px">'
+               + a.icon + ' ' + a.label + '</span>';
+    }
+    return '<div style="padding:10px 12px;border-radius:8px;margin-bottom:6px;' + style + '">'
+      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">'
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:11px;color:#555;margin-bottom:4px">'
+      + icon + ' <span style="color:#777">' + dtStr + '</span>'
+      + ' · <span style="color:#aaa">' + pipeLabel + '</span>' + errInfo
+      + '</div>'
+      + '<div style="font-size:12px;color:#ccc;word-break:break-word">' + (log.message || '') + '</div>'
+      + '</div></div></div>';
+  }).join('');
+}
+
+async function clearOldLogs() {
+  if (!sb) return;
+  var cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  await sb.from('pipeline_logs').delete().lt('created_at', cutoff);
+  toast('🗑️ 30일 이전 로그 삭제 완료');
+  loadPipelineLogs();
+}
+
+// 세션 시작 시 오류 배지 체크
+async function checkLogErrBadge() {
+  if (!sb) return;
+  var since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  var res = await sb.from('pipeline_logs').select('id', {count:'exact'})
+    .eq('level','error').gte('created_at', since).limit(1);
+  var badge = document.getElementById('logErrBadge');
+  if (badge) badge.style.display = (res.count > 0) ? 'block' : 'none';
+}
+
 // 저장된 탭 복원
 (function() {
   var savedTab = 3;
   try { savedTab = parseInt(localStorage.getItem('ibbun_tab') || '3'); } catch(e) {}
-  if (isNaN(savedTab) || savedTab < 0 || savedTab > 6) savedTab = 3;
+  if (isNaN(savedTab) || savedTab < 0 || savedTab > 7) savedTab = 3;
   if (savedTab <= 2) savedTab = 3; // 탭 0/1/2 비활성화 → 뉴스 탭
   showTab(savedTab);
 })();

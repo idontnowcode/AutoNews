@@ -18,6 +18,7 @@ from src.tts_generator        import generate_segments_tts
 from src.video_composer       import compose_video
 from src.youtube_uploader     import upload_shorts, get_next_optimal_time
 from src.settings_manager     import check_news_should_run, get_settings, get_content_language, get_scheduled_language
+from src.pipeline_logger      import log_error, log_warning, log_success
 
 load_dotenv()
 
@@ -141,11 +142,17 @@ def main():
             mark_news_pending(news['id'])
             if 'uploadLimitExceeded' in err:
                 print('⚠️  YouTube 일일 업로드 한도 초과. https://www.youtube.com/verify')
+                log_warning('news', 'YouTube 일일 업로드 한도 초과',
+                            error_type='upload_limit', news_id=news['id'])
+            else:
+                log_error('news', e, news_id=news['id'],
+                          context={'step': 'youtube_upload'})
             sys.exit(1)
         print(f'✅ 업로드 완료: https://youtube.com/shorts/{video_id}')
 
         # ── 8. DB 업데이트 ────────────────────────────────
         mark_news_done(news['id'], video_id)
+        log_success('news', f'업로드 완료: {script["title"]}', news_id=news['id'])
         print('💾 완료!')
 
     except SystemExit:
@@ -156,11 +163,15 @@ def main():
             print(f'⏸️  Anthropic API 한도 초과 — 뉴스를 pending 상태로 되돌립니다.')
             print(f'   복구 예정: {err}')
             if news:
-                mark_news_pending(news['id'])  # failed 대신 pending으로 복귀
+                mark_news_pending(news['id'])
+            log_warning('news', f'Anthropic API 한도 초과: {err[:200]}',
+                        error_type='api_limit',
+                        news_id=news['id'] if news else None)
             sys.exit(0)
         print(f'❌ 파이프라인 오류: {e}')
         if news:
             mark_news_failed(news['id'])
+        log_error('news', e, news_id=news['id'] if news else None)
         raise
 
 

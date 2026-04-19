@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS news_items (
   source         TEXT,                                    -- RSS 피드 출처명
   summary        TEXT,                                    -- 기사 요약 (500자 이내)
   status         TEXT DEFAULT 'pending'
-                 CHECK (status IN ('pending', 'queued', 'in_progress', 'done', 'failed')),
+                   CHECK (status IN ('pending', 'queued', 'in_progress', 'done', 'failed')),
   published_at   TIMESTAMPTZ,                             -- 기사 발행 시각
   category       TEXT DEFAULT '경제',                    -- 분야 (경제/스포츠/IT 등)
   interest_score INTEGER DEFAULT 0,                       -- 관심도 점수
@@ -182,3 +182,22 @@ ALTER TABLE video_stats ADD CONSTRAINT video_stats_video_type_check
 CREATE INDEX IF NOT EXISTS idx_video_stats_type     ON video_stats(video_type);
 CREATE INDEX IF NOT EXISTS idx_video_stats_category ON video_stats(category);
 CREATE INDEX IF NOT EXISTS idx_reports_created      ON analysis_reports(created_at DESC);
+
+-- ============================================================
+-- 파이프라인 실행 로그 (오류 추적 + 대응 방안)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS pipeline_logs (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  pipeline    TEXT NOT NULL CHECK (pipeline IN ('news', 'curriculum')),
+  level       TEXT NOT NULL CHECK (level IN ('error', 'warning', 'info', 'success')),
+  error_type  TEXT DEFAULT '',
+  message     TEXT,
+  news_id     UUID REFERENCES news_items(id) ON DELETE SET NULL,
+  topic_id    UUID REFERENCES topics(id)     ON DELETE SET NULL,
+  context     JSONB DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_pipeline_logs_created  ON pipeline_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pipeline_logs_level    ON pipeline_logs(level, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pipeline_logs_pipeline ON pipeline_logs(pipeline, created_at DESC);

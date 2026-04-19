@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 from src.topic_manager    import get_next_topic, mark_in_progress, mark_done, mark_pending, mark_failed, save_video
 from src.settings_manager import check_should_run, get_settings, get_content_language
+from src.pipeline_logger  import log_error, log_warning, log_success
 from src.script_generator import generate_script
 from src.image_generator  import generate_all_images
 from src.tts_generator    import generate_segments_tts
@@ -85,6 +86,11 @@ def main():
             if 'uploadLimitExceeded' in err:
                 print('⚠️  YouTube 일일 업로드 한도 초과.')
                 print('   해결: https://www.youtube.com/verify 에서 채널 인증 후 재시도')
+                log_warning('curriculum', 'YouTube 일일 업로드 한도 초과',
+                            error_type='upload_limit', topic_id=topic['id'])
+            else:
+                log_error('curriculum', e, topic_id=topic['id'],
+                          context={'step': 'youtube_upload'})
             sys.exit(1)
         print(f'✅ 업로드 완료: https://youtube.com/shorts/{video_id}')
 
@@ -93,6 +99,7 @@ def main():
         slide_prompts = [s.get('image_prompt') or s.get('dalle_prompt', '') for s in segments]
         save_video(topic['id'], video_id, script, slide_prompts)
         mark_done(topic['id'])
+        log_success('curriculum', f'업로드 완료: {script["title"]}', topic_id=topic['id'])
         print('   완료!')
 
     except SystemExit:
@@ -103,11 +110,15 @@ def main():
             print(f'⏸️  Anthropic API 한도 초과 — 주제를 pending 상태로 되돌립니다.')
             print(f'   복구 예정: {err}')
             if topic:
-                mark_pending(topic['id'])  # failed 대신 pending으로 복귀
+                mark_pending(topic['id'])
+            log_warning('curriculum', f'Anthropic API 한도 초과: {err[:200]}',
+                        error_type='api_limit',
+                        topic_id=topic['id'] if topic else None)
             sys.exit(0)
         print(f'❌ 파이프라인 오류: {e}')
         if topic:
             mark_failed(topic['id'])
+        log_error('curriculum', e, topic_id=topic['id'] if topic else None)
         raise
 
 
