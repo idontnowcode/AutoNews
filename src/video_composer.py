@@ -69,18 +69,46 @@ def _get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
 
 
 def _wrap_text(draw, text: str, font, max_width: int) -> list:
+    """균형 잡힌 줄바꿈: 각 줄 너비가 고르도록 분할 (한국어 최적화).
+    greedy 방식(첫 줄 꽉 채우기) 대신 목표 너비(total/n_lines)에 맞게 균등 배분.
+    """
     words = text.split()
-    lines, cur = [], ''
-    for w in words:
-        test = f'{cur} {w}'.strip()
-        if draw.textlength(test, font=font) <= max_width:
-            cur = test
+    if not words:
+        return [text] if text else []
+
+    space_w     = draw.textlength(' ', font=font)
+    word_widths = [draw.textlength(w, font=font) for w in words]
+    total_w     = sum(word_widths) + space_w * max(0, len(words) - 1)
+
+    # 한 줄에 들어가면 그대로 반환
+    if total_w <= max_width:
+        return [' '.join(words)]
+
+    # 예상 줄 수 → 줄당 목표 너비
+    n_lines  = max(2, int(total_w / max_width) + 1)
+    target_w = total_w / n_lines
+
+    lines, cur_words, cur_w = [], [], 0.0
+
+    for w, ww in zip(words, word_widths):
+        gap   = space_w if cur_words else 0.0
+        new_w = cur_w + gap + ww
+
+        if cur_words and new_w > max_width:
+            # max_width 초과 → 강제 줄바꿈
+            lines.append(' '.join(cur_words))
+            cur_words, cur_w = [w], ww
+        elif cur_words and cur_w >= target_w and len(lines) < n_lines - 1:
+            # 목표 너비 도달 + 줄 여유 있음 → 균형 줄바꿈
+            lines.append(' '.join(cur_words))
+            cur_words, cur_w = [w], ww
         else:
-            if cur:
-                lines.append(cur)
-            cur = w
-    if cur:
-        lines.append(cur)
+            cur_words.append(w)
+            cur_w = new_w
+
+    if cur_words:
+        lines.append(' '.join(cur_words))
+
     return lines
 
 
