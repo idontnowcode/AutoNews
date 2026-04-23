@@ -4,6 +4,7 @@
 """
 import os
 import re
+import time
 import anthropic
 from src.script_generator import fix_title_grammar, extract_json, append_outro
 
@@ -255,22 +256,30 @@ def generate_news_script(news_item: dict, language: str = 'ko') -> dict:
     else:
         image_rule = IMAGE_RULE_DEFAULT
 
-    # ── 1단계: 스크립트 초안 생성 ─────────────────────
+    # ── 1단계: 스크립트 초안 생성 (529 Overloaded 시 최대 3회 재시도) ──
     prompt_tpl = NEWS_PROMPT_EN if language == 'en' else NEWS_PROMPT
-    msg = _get_client().messages.create(
-        model='claude-sonnet-4-6',
-        max_tokens=2048,
-        messages=[{
-            'role': 'user',
-            'content': prompt_tpl.format(
-                title=news_item.get('title', ''),
-                source=news_item.get('source', ''),
-                summary=news_item.get('summary', news_item.get('title', '')),
-                category=category,
-                image_rule=image_rule,
-            )
-        }]
+    prompt_content = prompt_tpl.format(
+        title=news_item.get('title', ''),
+        source=news_item.get('source', ''),
+        summary=news_item.get('summary', news_item.get('title', '')),
+        category=category,
+        image_rule=image_rule,
     )
+    for attempt in range(3):
+        try:
+            msg = _get_client().messages.create(
+                model='claude-sonnet-4-6',
+                max_tokens=2048,
+                messages=[{'role': 'user', 'content': prompt_content}]
+            )
+            break
+        except anthropic.APIStatusError as e:
+            if e.status_code == 529 and attempt < 2:
+                wait = 30 * (attempt + 1)
+                print(f'   ⏳ Anthropic 과부하(529) — {wait}초 후 재시도 ({attempt+1}/3)...')
+                time.sleep(wait)
+            else:
+                raise
     result = extract_json(msg.content[0].text.strip())
 
     # 제목 후처리 (한국어 이란/란 문법 교정)

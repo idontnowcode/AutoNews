@@ -170,13 +170,17 @@ def main():
         raise
     except Exception as e:
         err = str(e)
-        if 'usage' in err.lower() and ('limit' in err.lower() or '400' in err):
-            print(f'⏸️  Anthropic API 한도 초과 — 뉴스를 pending 상태로 되돌립니다.')
+        # Anthropic API 한도 초과 or 과부하(529) → pending 으로 되돌려 재시도 가능하게
+        is_api_limit     = 'usage' in err.lower() and ('limit' in err.lower() or '400' in err)
+        is_overloaded    = '529' in err or 'overloaded' in err.lower()
+        if is_api_limit or is_overloaded:
+            reason = 'Anthropic API 과부하(529)' if is_overloaded else 'Anthropic API 한도 초과'
+            print(f'⏸️  {reason} — 뉴스를 pending 상태로 되돌립니다.')
             print(f'   복구 예정: {err}')
             if news:
                 mark_news_pending(news['id'])
-            log_warning('news', f'Anthropic API 한도 초과: {err[:200]}',
-                        error_type='api_limit',
+            log_warning('news', f'{reason}: {err[:200]}',
+                        error_type='overloaded' if is_overloaded else 'api_limit',
                         news_id=news['id'] if news else None)
             sys.exit(0)
         print(f'❌ 파이프라인 오류: {e}')
