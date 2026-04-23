@@ -167,8 +167,8 @@ def _draw_title_multicolor(draw, title: str, y: int, font,
 
 
 def _get_sub_font(title_font_size: int) -> ImageFont.FreeTypeFont:
-    """자막 폰트: 타이틀 폰트 크기의 70% 고정."""
-    size = max(28, int(title_font_size * 0.7))
+    """자막 폰트: 타이틀 폰트 크기의 70% + 2pt."""
+    size = max(28, int(title_font_size * 0.7) + 2)
     return _get_font(size, bold=True)
 
 
@@ -402,57 +402,42 @@ def _draw_subtitle(base_img: Image.Image, text: str,
     return np.array(img)
 
 
-# ── 타이핑 효과 클립 생성 ─────────────────────────────────────────────
+# ── 청크 클립 생성 (타이핑 없음, 즉시 표시) ──────────────────────────
 
-def _make_subtitle_clip(title: str, image_path: str,
-                        narration: str, audio_path: str,
-                        img_sq: np.ndarray = None,
-                        prev_img_arr: np.ndarray = None,
-                        kb_mode: str = 'zoom_in',
-                        trans_mode: str = None):
+def _make_chunk_clip(title: str, image_path: str,
+                     text: str, audio_path: str,
+                     img_sq: np.ndarray = None,
+                     prev_img_arr: np.ndarray = None,
+                     kb_mode: str = 'zoom_in',
+                     trans_mode: str = None):
     """
-    자막 타이핑 + Ken Burns + 전환 효과가 적용된 VideoClip 반환.
-
-    자막은 이미지 위에 직접 오버레이 (흰 글씨 + 검정 테두리, 이미지 하단 25%).
+    자막 청크 1개 VideoClip 반환.
+    - 자막은 오디오 시작과 동시에 즉시 표시 (타이핑 효과 없음)
+    - Ken Burns + 전환 효과는 그대로 적용
     """
     if img_sq is None and image_path:
         img_sq = _load_img_sq(image_path)
 
-    base_img, img_y, sub_font, line_h, sub_y, pad = _make_base_bg(title, narration)
-    base_arr     = np.array(base_img)  # 제목+검정 배경 (이미지 영역은 검정)
+    base_img, img_y, sub_font, line_h, sub_y, pad = _make_base_bg(title, text)
+    base_arr = np.array(base_img)
 
     audio        = AudioFileClip(audio_path)
     duration     = audio.duration
     total_frames = max(1, int(duration * FPS))
 
-    # 나레이션 전체 줄 분할 (줄 수 제한 없음 — 줄 단위로 순서대로 전환)
+    # 자막 줄 분할 (MAX_SUB_LINES 적용)
     _ref_draw = ImageDraw.Draw(base_img.copy())
-    all_lines = _wrap_text(_ref_draw, narration, sub_font, SUB_MAX_WIDTH)
-    if not all_lines:
-        all_lines = [narration] if narration else ['']
-
-    # 각 줄에 오디오 시간 비례 배분 (글자 수 기준)
-    line_lengths  = [max(1, len(l)) for l in all_lines]
-    total_lc      = sum(line_lengths)
-    natural_end   = total_lc / TYPING_SPEED
-    typing_end    = min(natural_end, duration * 0.85)
-
-    line_ranges: list[tuple[float, float]] = []
-    elapsed = 0.0
-    for lc in line_lengths:
-        t_end = elapsed + (lc / total_lc) * typing_end
-        line_ranges.append((elapsed, t_end))
-        elapsed = t_end
+    lines = _wrap_text(_ref_draw, text, sub_font, SUB_MAX_WIDTH)[:MAX_SUB_LINES]
 
     # ── 프레임 생성 ──────────────────────────────────────────────────
     frames = []
     for i in range(total_frames):
         t = i / FPS
 
-        # 1. 베이스 (제목+검정 배경) 복사
+        # 1. 베이스 복사
         frame_arr = base_arr.copy()
 
-        # 2. 이미지 영역: KB 효과 + 전환 효과
+        # 2. 이미지 + KB 효과 + 전환 효과
         if img_sq is not None:
             prog     = min(t / max(duration, 0.001), 1.0)
             curr_img = _kb(img_sq, prog, kb_mode)
@@ -465,34 +450,19 @@ def _make_subtitle_clip(title: str, image_path: str,
 
             frame_arr[img_y:img_y + IMG_SIZE, 0:IMG_SIZE] = img_area
 
-        # 3. 현재 시각에 해당하는 줄 선택 + 타이핑 효과
-        cur_li = len(all_lines) - 1
-        for li, (t_start, t_end) in enumerate(line_ranges):
-            if t < t_end:
-                cur_li = li
-                break
-
-        current_line        = all_lines[cur_li]
-        t_start, t_end      = line_ranges[cur_li]
-        line_dur            = t_end - t_start
-
-        if line_dur <= 0 or t >= t_end:
-            visible = current_line
-        else:
-            progress = (t - t_start) / line_dur
-            n        = max(1, min(int(progress * len(current_line)) + 1,
-                                  len(current_line)))
-            visible  = current_line[:n]
-
-        if visible:
+        # 3. 자막 즉시 표시
+        if text:
             frame_pil = Image.fromarray(frame_arr)
             draw      = ImageDraw.Draw(frame_pil)
-            lw = draw.textlength(visible, font=sub_font)
-            draw.text(
-                ((W - lw) // 2, sub_y), visible,
-                font=sub_font, fill=C_WHITE,
-                stroke_width=SUB_STROKE, stroke_fill=C_BLACK,
-            )
+            y = sub_y
+            for line in lines:
+                lw = draw.textlength(line, font=sub_font)
+                draw.text(
+                    ((W - lw) // 2, y), line,
+                    font=sub_font, fill=C_WHITE,
+                    stroke_width=SUB_STROKE, stroke_fill=C_BLACK,
+                )
+                y += line_h
             frame_arr = np.array(frame_pil)
 
         frames.append(frame_arr)
@@ -504,10 +474,8 @@ def _make_subtitle_clip(title: str, image_path: str,
         clip = clip.set_audio(audio)
 
     font_size = sub_font.size if hasattr(sub_font, 'size') else '?'
-    print(f'   [타이핑] "{narration[:25]}..." '
-          f'| {total_lc}자 {len(all_lines)}줄 | 폰트 {font_size}px '
-          f'| {typing_end:.1f}s 내 완성 | 총 {duration:.1f}s'
-          f' | KB={kb_mode} TRANS={trans_mode or "없음"}')
+    print(f'   [청크] "{text[:30]}" | 폰트 {font_size}px'
+          f' | {duration:.1f}s | KB={kb_mode} TRANS={trans_mode or "없음"}')
     return clip
 
 
@@ -545,17 +513,23 @@ def compose_video(segments_data: list, title: str, output_path: str) -> str:
     for i, seg in enumerate(segments_data):
         kb_mode, trans_mode = effects[i]
 
-        clip = _make_subtitle_clip(
-            title        = title,
-            image_path   = seg.get('image_path', ''),
-            narration    = seg['narration'],
-            audio_path   = seg['audio_path'],
-            img_sq       = img_sqs[i],
-            prev_img_arr = prev_img_arr,
-            kb_mode      = kb_mode,
-            trans_mode   = trans_mode,
-        )
-        clips.append(clip)
+        # audio_chunks 우선 사용, 없으면 기존 단일 audio_path/narration fallback
+        chunks = seg.get('audio_chunks') or [
+            {'text': seg['narration'], 'audio_path': seg['audio_path']}
+        ]
+
+        for j, chunk in enumerate(chunks):
+            clip = _make_chunk_clip(
+                title        = title,
+                image_path   = seg.get('image_path', ''),
+                text         = chunk['text'],
+                audio_path   = chunk['audio_path'],
+                img_sq       = img_sqs[i],
+                prev_img_arr = prev_img_arr if j == 0 else None,
+                kb_mode      = kb_mode,
+                trans_mode   = trans_mode if j == 0 else None,
+            )
+            clips.append(clip)
 
         if img_sqs[i] is not None:
             prev_img_arr = _kb(img_sqs[i], 1.0, kb_mode)

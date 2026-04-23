@@ -111,7 +111,8 @@ def main():
         tts_dir     = os.path.join(work_dir, 'audio')
         tts_results = generate_segments_tts(segments, tts_dir, language=language)
         for seg, tts in zip(segments, tts_results):
-            seg['audio_path'] = tts['audio_path']
+            seg['audio_path']   = tts['audio_path']
+            seg['audio_chunks'] = tts['audio_chunks']
 
         # ── 6. 영상 합성 ──────────────────────────────────
         seg_preview = " / ".join(s["narration"][:8] for s in segments)
