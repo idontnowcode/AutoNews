@@ -17,7 +17,9 @@ from src.image_generator      import generate_all_images
 from src.tts_generator        import generate_segments_tts
 from src.video_composer       import compose_video
 from src.youtube_uploader     import upload_shorts, get_next_optimal_time
-from src.settings_manager     import check_news_should_run, get_settings, get_content_language, get_scheduled_language
+from src.settings_manager     import (check_news_should_run, get_settings,
+                                      get_content_language, get_scheduled_language,
+                                      record_slot_run)
 from src.pipeline_logger      import log_error, log_warning, log_success
 
 load_dotenv()
@@ -157,6 +159,9 @@ def main():
 
         # ── 8. DB 업데이트 ────────────────────────────────
         mark_news_done(news['id'], video_id)
+        # 예약 발행 모드에서 같은 슬롯이 중복 실행되지 않도록 기록
+        if schedule_on and not news_id_override:
+            record_slot_run()
         log_success('news', f'업로드 완료: {script["title"]}', news_id=news['id'])
         print('💾 완료!')
 

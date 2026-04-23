@@ -16,9 +16,11 @@ RSS_FEEDS_KO = {
         ('구글뉴스 경제',  'https://news.google.com/rss/search?q=한국+경제+금융&hl=ko&gl=KR&ceid=KR:ko'),
     ],
     '스포츠': [
-        ('연합뉴스 스포츠', 'https://www.yna.co.kr/rss/sports.xml'),
-        ('스포츠조선',      'https://news.google.com/rss/search?q=스포츠+한국&hl=ko&gl=KR&ceid=KR:ko'),
-        ('구글뉴스 스포츠', 'https://news.google.com/rss/search?q=야구+축구+농구+한국&hl=ko&gl=KR&ceid=KR:ko'),
+        ('구글뉴스 NBA',       'https://news.google.com/rss/search?q=NBA+농구+레이커스+셀틱스+커리+제임스&hl=ko&gl=KR&ceid=KR:ko'),
+        ('구글뉴스 프리미어리그', 'https://news.google.com/rss/search?q=프리미어리그+EPL+맨시티+아스날+리버풀+첼시&hl=ko&gl=KR&ceid=KR:ko'),
+        ('구글뉴스 유럽축구',  'https://news.google.com/rss/search?q=챔피언스리그+라리가+분데스리가+세리에A+레알마드리드+바르셀로나&hl=ko&gl=KR&ceid=KR:ko'),
+        ('구글뉴스 MLB',       'https://news.google.com/rss/search?q=MLB+메이저리그+오타니+야마모토&hl=ko&gl=KR&ceid=KR:ko'),
+        ('구글뉴스 NFL',       'https://news.google.com/rss/search?q=NFL+미식축구+슈퍼볼&hl=ko&gl=KR&ceid=KR:ko'),
     ],
     'IT/테크': [
         ('연합뉴스 IT',    'https://www.yna.co.kr/rss/it.xml'),
@@ -53,8 +55,15 @@ RSS_FEEDS_EN = {
         ('Google News AI',     'https://news.google.com/rss/search?q=artificial+intelligence+AI+tech+Apple+Google&hl=en&gl=US&ceid=US:en'),
     ],
     '스포츠': [
-        ('BBC Sport',          'https://feeds.bbci.co.uk/sport/rss.xml'),
-        ('Google News Sports', 'https://news.google.com/rss/search?q=sports+NFL+NBA+MLB+soccer+transfer&hl=en&gl=US&ceid=US:en'),
+        ('ESPN',                   'https://www.espn.com/espn/rss/news'),
+        ('ESPN NBA',               'https://www.espn.com/espn/rss/nba/news'),
+        ('ESPN Soccer',            'https://www.espn.com/espn/rss/soccer/news'),
+        ('BBC Sport',              'https://feeds.bbci.co.uk/sport/rss.xml'),
+        ('Google News NBA',        'https://news.google.com/rss/search?q=NBA+basketball+playoffs+trade&hl=en&gl=US&ceid=US:en'),
+        ('Google News EPL',        'https://news.google.com/rss/search?q=Premier+League+Arsenal+Manchester+Liverpool+Chelsea&hl=en&gl=US&ceid=US:en'),
+        ('Google News Champions',  'https://news.google.com/rss/search?q=Champions+League+UEFA+La+Liga+Real+Madrid+Barcelona&hl=en&gl=US&ceid=US:en'),
+        ('Google News MLB',        'https://news.google.com/rss/search?q=MLB+baseball+Ohtani+Yankees+Dodgers&hl=en&gl=US&ceid=US:en'),
+        ('Google News NFL',        'https://news.google.com/rss/search?q=NFL+football+Super+Bowl+touchdown&hl=en&gl=US&ceid=US:en'),
     ],
     '정치': [
         ('Politico',           'https://www.politico.com/rss/politicopicks.xml'),

@@ -203,6 +203,22 @@ CREATE INDEX IF NOT EXISTS idx_pipeline_logs_level    ON pipeline_logs(level, cr
 CREATE INDEX IF NOT EXISTS idx_pipeline_logs_pipeline ON pipeline_logs(pipeline, created_at DESC);
 
 -- ============================================================
+-- 설정 테이블 (key-value store)
+-- 업로드 스케줄, 언어, 슬롯 실행 잠금 등 다양한 설정 저장
+-- ============================================================
+CREATE TABLE IF NOT EXISTS settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- updated_at 자동 갱신 트리거 (선택 사항 — 없어도 동작에 무관)
+-- CREATE OR REPLACE FUNCTION update_settings_updated_at()
+-- RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+-- CREATE TRIGGER trg_settings_updated_at BEFORE UPDATE ON settings
+--   FOR EACH ROW EXECUTE FUNCTION update_settings_updated_at();
+
+-- ============================================================
 -- 기존 DB 마이그레이션 — topics.status에 'failed' 추가
 -- 이미 CREATE TABLE을 실행한 DB에서만 필요
 -- ============================================================

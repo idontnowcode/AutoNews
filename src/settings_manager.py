@@ -7,11 +7,17 @@ Supabase settings 테이블에서 설정 읽기 + 예약 발행 실행 여부 �
   2. upload_schedule_enabled == 'true'
   3. 오늘 요일이 upload_schedule_days에 포함
   4. 현재 UTC 시각이 upload_schedule_slots의 해당 카테고리 슬롯과 일치
+  5. 같은 슬롯에서 이미 실행된 적 없음 (슬롯 중복 실행 방지)
 """
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from src.db_client import get_client
+
+# ── 슬롯 실행 기록 (process-level) ───────────────────────────────────
+# _is_in_schedule_window()에서 설정 → record_slot_run()에서 DB에 기록
+_slot_key: str | None = None       # 예) '2025-04-19_14' (KST date + matched hour)
+_slot_lock_key: str | None = None  # 예) 'last_news_slot_run'
 
 _DAY_MAP = {'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3, 'fri': 4, 'sat': 5, 'sun': 6}
 _DAY_KO  = ['월', '화', '수', '목', '금', '토', '일']
@@ -21,6 +27,25 @@ def get_settings() -> dict:
     db = get_client()
     res = db.table('settings').select('key,value').execute()
     return {r['key']: r['value'] for r in (res.data or [])}
+
+
+def save_setting(key: str, value: str):
+    """settings 테이블에 key=value upsert 저장"""
+    db = get_client()
+    db.table('settings').upsert({'key': key, 'value': value},
+                                 on_conflict='key').execute()
+
+
+def record_slot_run():
+    """
+    현재 파이프라인이 매칭한 슬롯을 '이미 실행됨'으로 DB에 기록.
+    다음 cron 실행이 같은 슬롯 내에 도달해도 중복 실행을 차단한다.
+    업로드 성공 직후에 호출해야 한다.
+    """
+    global _slot_key, _slot_lock_key
+    if _slot_key and _slot_lock_key:
+        save_setting(_slot_lock_key, _slot_key)
+        print(f'   🔒 슬롯 실행 기록 저장: {_slot_lock_key} = {_slot_key}')
 
 
 def _is_in_schedule_window(settings: dict, category: str) -> bool:
@@ -79,6 +104,22 @@ def _is_in_schedule_window(settings: dict, category: str) -> bool:
         print(f'   ⏰ 현재 {kst_hour}시(KST)는 업로드 시간 아님'
               f' (설정: {slots_kst_str}) — 건너뜁니다')
         return False
+
+    # ── 슬롯 중복 실행 방지 ───────────────────────────────────────────
+    # 같은 KST 날짜+슬롯 시간에 이미 실행됐으면 건너뜀
+    # 이전 실행이 record_slot_run()으로 DB에 기록해 두었을 때만 차단
+    now_kst = datetime.now(timezone(timedelta(hours=9)))
+    today_kst = now_kst.strftime('%Y-%m-%d')
+    slot_key = f'{today_kst}_{matched_hour:02d}'
+    lock_key = f'last_{category}_slot_run'
+    if settings.get(lock_key, '') == slot_key:
+        print(f'   🔒 슬롯 중복 방지 — {matched_hour}시 슬롯은 이미 실행됨 ({today_kst})')
+        return False
+
+    # process-level 변수에 저장 → 업로드 성공 후 record_slot_run()이 DB에 기록
+    global _slot_key, _slot_lock_key
+    _slot_key = slot_key
+    _slot_lock_key = lock_key
 
     minutes_to = (matched_hour * 60 - now_kst_min) % (24 * 60)
     if minutes_to == 0:
