@@ -30,12 +30,10 @@ IMG_SIZE  = 1080
 
 # 자막: 이미지 하단 25% 지점에 오버레이 (이미지 위에 직접 렌더링)
 SUB_OVERLAY_RATIO = 0.75   # IMG_SIZE 기준 이 비율 위치에 자막 상단 배치
-SUB_STROKE        = 3      # 자막 검정 테두리 두께 (px)
+SUB_STROKE        = 8      # 자막 검정 테두리 두께 (px)
 SUB_MAX_WIDTH     = W - 240   # 840px (YouTube Shorts 우측 버튼 여백 고려)
 
-# 자막 폰트 크기 후보 (큰 것부터 시도)
-SUB_FONT_SIZES = (62, 52, 44, 36)
-MAX_SUB_LINES  = 2    # 최대 자막 줄 수 (3줄 이상 금지)
+MAX_SUB_LINES  = 1    # 최대 자막 줄 수 (1줄 고정)
 TYPING_SPEED   = 12   # chars/sec 기준 (실제 속도는 오디오 길이에 맞게 보정됨)
 
 # 타이틀 검정 테두리 두께
@@ -119,14 +117,31 @@ def _fit_title_font(draw, title: str, max_width: int,
     return _get_font(48, bold=True)
 
 
-def _auto_sub_font(narration: str) -> ImageFont.FreeTypeFont:
-    """나레이션이 MAX_SUB_LINES 이하로 줄바꿈되는 가장 큰 폰트 반환."""
-    tmp_draw = ImageDraw.Draw(Image.new('RGB', (10, 10)))
-    for size in SUB_FONT_SIZES:
-        font = _get_font(size, bold=True)
-        if len(_wrap_text(tmp_draw, narration, font, SUB_MAX_WIDTH)) <= MAX_SUB_LINES:
-            return font
-    return _get_font(SUB_FONT_SIZES[-1], bold=True)
+def _draw_title_multicolor(draw, title: str, y: int, font,
+                            max_width: int, line_gap: int = 16,
+                            stroke_width: int = 4) -> int:
+    """타이틀을 줄 수에 따라 색상을 달리하여 그림.
+    - 1줄: YELLOW
+    - 2줄 이상: 마지막 줄만 YELLOW, 나머지는 WHITE
+    """
+    lines = _wrap_text(draw, title, font, max_width)
+    total = len(lines)
+    for idx, line in enumerate(lines):
+        color = C_YELLOW if (total == 1 or idx == total - 1) else C_WHITE
+        lw = draw.textlength(line, font=font)
+        draw.text(
+            ((W - lw) // 2, y), line, font=font, fill=color,
+            stroke_width=stroke_width, stroke_fill=C_BLACK,
+        )
+        bbox = draw.textbbox((0, 0), line, font=font)
+        y += (bbox[3] - bbox[1]) + line_gap
+    return y
+
+
+def _get_sub_font(title_font_size: int) -> ImageFont.FreeTypeFont:
+    """자막 폰트: 타이틀 폰트 크기의 70% 고정."""
+    size = max(28, int(title_font_size * 0.7))
+    return _get_font(size, bold=True)
 
 
 def _line_char_ranges(narration: str, lines: list) -> list:
@@ -275,15 +290,16 @@ def _make_base_bg(title: str, narration: str = '') -> tuple:
 
     title_font = _fit_title_font(draw, title, W - pad * 2, max_height=230)
     title_h    = _measure_text_height(draw, title, title_font, W - pad * 2)
-    _draw_centered_text(
-        draw, title, TITLE_TOP, title_font, C_YELLOW, W - pad * 2,
-        line_gap=16, stroke_width=TITLE_STROKE, stroke_fill=C_BLACK,
+    _draw_title_multicolor(
+        draw, title, TITLE_TOP, title_font, W - pad * 2,
+        line_gap=16, stroke_width=TITLE_STROKE,
     )
 
     img_y = max(IMG_Y, TITLE_TOP + title_h + 40)
     img_y = min(img_y, H - IMG_SIZE - 360)
 
-    sub_font = _auto_sub_font(narration) if narration else _get_font(62, bold=True)
+    title_font_size = title_font.size if hasattr(title_font, 'size') else 96
+    sub_font = _get_sub_font(title_font_size)
     _test_bb = sub_font.getbbox('Ag가')
     line_h   = (_test_bb[3] - _test_bb[1]) + 14
 
@@ -303,9 +319,9 @@ def _make_base(title: str, image_path: str, narration: str = '') -> tuple:
 
     title_font = _fit_title_font(draw, title, W - pad * 2, max_height=230)
     title_h    = _measure_text_height(draw, title, title_font, W - pad * 2)
-    _draw_centered_text(
-        draw, title, TITLE_TOP, title_font, C_YELLOW, W - pad * 2,
-        line_gap=16, stroke_width=TITLE_STROKE, stroke_fill=C_BLACK,
+    _draw_title_multicolor(
+        draw, title, TITLE_TOP, title_font, W - pad * 2,
+        line_gap=16, stroke_width=TITLE_STROKE,
     )
 
     img_y = max(IMG_Y, TITLE_TOP + title_h + 40)
@@ -322,7 +338,8 @@ def _make_base(title: str, image_path: str, narration: str = '') -> tuple:
     else:
         draw.rectangle([(0, img_y), (W, img_y + IMG_SIZE)], fill=C_BLACK)
 
-    sub_font = _auto_sub_font(narration) if narration else _get_font(62, bold=True)
+    title_font_size = title_font.size if hasattr(title_font, 'size') else 96
+    sub_font = _get_sub_font(title_font_size)
     _test_bb = sub_font.getbbox('Ag가')
     line_h   = (_test_bb[3] - _test_bb[1]) + 14
 
