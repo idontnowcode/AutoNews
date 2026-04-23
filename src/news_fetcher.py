@@ -16,11 +16,30 @@ RSS_FEEDS_KO = {
         ('구글뉴스 경제',  'https://news.google.com/rss/search?q=한국+경제+금융&hl=ko&gl=KR&ceid=KR:ko'),
     ],
     '스포츠': [
-        ('구글뉴스 NBA',       'https://news.google.com/rss/search?q=NBA+농구+레이커스+셀틱스+커리+제임스&hl=ko&gl=KR&ceid=KR:ko'),
-        ('구글뉴스 프리미어리그', 'https://news.google.com/rss/search?q=프리미어리그+EPL+맨시티+아스날+리버풀+첼시&hl=ko&gl=KR&ceid=KR:ko'),
-        ('구글뉴스 유럽축구',  'https://news.google.com/rss/search?q=챔피언스리그+라리가+분데스리가+세리에A+레알마드리드+바르셀로나&hl=ko&gl=KR&ceid=KR:ko'),
-        ('구글뉴스 MLB',       'https://news.google.com/rss/search?q=MLB+메이저리그+오타니+야마모토&hl=ko&gl=KR&ceid=KR:ko'),
-        ('구글뉴스 NFL',       'https://news.google.com/rss/search?q=NFL+미식축구+슈퍼볼&hl=ko&gl=KR&ceid=KR:ko'),
+        # ── 해외축구 ① 한국 선수 ──────────────────────────────────
+        ('해외축구_한국선수',
+         'https://news.google.com/rss/search?q=손흥민+OR+이강인+OR+김민재+OR+황희찬+OR+조규성&hl=ko&gl=KR&ceid=KR:ko'),
+        # ── 해외축구 ② 리그·클럽·이적 ────────────────────────────
+        ('해외축구_리그이슈',
+         'https://news.google.com/rss/search?q=프리미어리그+OR+챔피언스리그+OR+유로파리그+OR+엘클라시코+OR+이적시장&hl=ko&gl=KR&ceid=KR:ko'),
+        # ── KBO ① 스타 선수 ──────────────────────────────────────
+        ('KBO_스타',
+         'https://news.google.com/rss/search?q=김도영+OR+류현진+OR+노시환+OR+구자욱+OR+양의지+OR+강민호&hl=ko&gl=KR&ceid=KR:ko'),
+        # ── KBO ② 구단·FA ────────────────────────────────────────
+        ('KBO_구단',
+         'https://news.google.com/rss/search?q=KBO+OR+KIA타이거즈+OR+한화이글스+OR+삼성라이온즈+OR+롯데자이언츠+OR+LG트윈스+OR+FA시장&hl=ko&gl=KR&ceid=KR:ko'),
+        # ── MLB 한국 선수 + 빅이슈 ────────────────────────────────
+        ('MLB',
+         'https://news.google.com/rss/search?q=이정후+OR+김하성+OR+오타니+OR+메이저리그+OR+월드시리즈+OR+코리안더비&hl=ko&gl=KR&ceid=KR:ko'),
+        # ── 국가대표·메가이벤트 ───────────────────────────────────
+        ('국가대표',
+         'https://news.google.com/rss/search?q=월드컵+OR+축구국가대표+OR+WBC+OR+한일전+OR+아시안컵+OR+아시안게임&hl=ko&gl=KR&ceid=KR:ko'),
+        # ── 농구·배구·테니스 ──────────────────────────────────────
+        ('기타스포츠',
+         'https://news.google.com/rss/search?q=NBA+OR+V리그+OR+KBL+OR+테니스+OR+권순우+OR+김연경+OR+허웅&hl=ko&gl=KR&ceid=KR:ko'),
+        # ── e스포츠·골프·러닝·라이프스타일 ──────────────────────
+        ('라이프스타일',
+         'https://news.google.com/rss/search?q=LCK+OR+T1+OR+페이커+OR+KLPGA+OR+골프+OR+러닝크루+OR+쿠팡플레이&hl=ko&gl=KR&ceid=KR:ko'),
     ],
     'IT/테크': [
         ('연합뉴스 IT',    'https://www.yna.co.kr/rss/it.xml'),
@@ -55,15 +74,13 @@ RSS_FEEDS_EN = {
         ('Google News AI',     'https://news.google.com/rss/search?q=artificial+intelligence+AI+tech+Apple+Google&hl=en&gl=US&ceid=US:en'),
     ],
     '스포츠': [
-        ('ESPN',                   'https://www.espn.com/espn/rss/news'),
-        ('ESPN NBA',               'https://www.espn.com/espn/rss/nba/news'),
         ('ESPN Soccer',            'https://www.espn.com/espn/rss/soccer/news'),
+        ('ESPN NBA',               'https://www.espn.com/espn/rss/nba/news'),
         ('BBC Sport',              'https://feeds.bbci.co.uk/sport/rss.xml'),
-        ('Google News NBA',        'https://news.google.com/rss/search?q=NBA+basketball+playoffs+trade&hl=en&gl=US&ceid=US:en'),
         ('Google News EPL',        'https://news.google.com/rss/search?q=Premier+League+Arsenal+Manchester+Liverpool+Chelsea&hl=en&gl=US&ceid=US:en'),
-        ('Google News Champions',  'https://news.google.com/rss/search?q=Champions+League+UEFA+La+Liga+Real+Madrid+Barcelona&hl=en&gl=US&ceid=US:en'),
-        ('Google News MLB',        'https://news.google.com/rss/search?q=MLB+baseball+Ohtani+Yankees+Dodgers&hl=en&gl=US&ceid=US:en'),
-        ('Google News NFL',        'https://news.google.com/rss/search?q=NFL+football+Super+Bowl+touchdown&hl=en&gl=US&ceid=US:en'),
+        ('Google News UCL',        'https://news.google.com/rss/search?q=Champions+League+UEFA+Real+Madrid+Barcelona&hl=en&gl=US&ceid=US:en'),
+        ('Google News NBA',        'https://news.google.com/rss/search?q=NBA+basketball+playoffs+trade+Curry+James&hl=en&gl=US&ceid=US:en'),
+        ('Google News MLB',        'https://news.google.com/rss/search?q=MLB+baseball+Ohtani+Dodgers+Yankees&hl=en&gl=US&ceid=US:en'),
     ],
     '정치': [
         ('Politico',           'https://www.politico.com/rss/politicopicks.xml'),
@@ -182,17 +199,23 @@ def save_new_items(items: list[dict]) -> int:
     """중복 제외하고 신규 뉴스만 DB에 저장 (관심도 채점 포함)"""
     from src.news_scorer import score_items, print_score_summary
 
-    # 관심도 채점 (저장 전 일괄 처리)
-    scored = score_items(items)
-    print_score_summary(scored)
-
-    # 낮음 관심도 제외 설정 확인
     settings = get_news_settings()
-    skip_low = settings.get('news_skip_low', 'false').lower() == 'true'
-    if skip_low:
-        before = len(scored)
-        scored = [it for it in scored if it.get('interest_level') != 'low']
-        print(f'   🔽 낮음 관심도 제외: {before - len(scored)}건 스킵 → {len(scored)}건 저장 대상')
+    score_enabled = settings.get('news_score_enabled', 'true').lower() != 'false'
+
+    if score_enabled:
+        # 관심도 채점 (저장 전 일괄 처리)
+        scored = score_items(items)
+        print_score_summary(scored)
+        # 낮음 관심도 제외 설정 확인
+        skip_low = settings.get('news_skip_low', 'false').lower() == 'true'
+        if skip_low:
+            before = len(scored)
+            scored = [it for it in scored if it.get('interest_level') != 'low']
+            print(f'   🔽 낮음 관심도 제외: {before - len(scored)}건 스킵 → {len(scored)}건 저장 대상')
+    else:
+        # 관심도 채점 비활성화 — 모든 뉴스를 medium으로 처리
+        scored = [{**it, 'interest_score': 5, 'interest_level': 'medium'} for it in items]
+        print(f'   📊 관심도 채점 OFF — {len(scored)}건 전량 저장 대상')
 
     db = get_client()
 
