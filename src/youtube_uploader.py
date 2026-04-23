@@ -114,7 +114,7 @@ def upload_shorts(video_path: str, script_data: dict,
                 'title':           yt_title,
                 'description':     description,
                 'tags':            script_data.get('hashtags', []) + ['Shorts'],
-                'categoryId':      '25',
+                'categoryId':      '17',
                 'defaultLanguage': yt_language,
             },
             'status': {

@@ -1,8 +1,22 @@
 import os
+import subprocess
 import requests
 
 DEFAULT_VOICE_ID = 'pNInz6obpgDQGcFmaJgB'  # Adam (multilingual) — Korean
 EN_VOICE_ID      = '21m00Tcm4TlvDq8ikWAM'  # Rachel — natural American English
+
+
+TTS_SPEED = 1.2  # 음성 재생 속도 배율 (ffmpeg atempo)
+
+
+def _speedup_audio(path: str, speed: float = TTS_SPEED) -> None:
+    """ffmpeg atempo 필터로 오디오 속도를 speed 배율로 조정 (in-place)."""
+    tmp = path + '.tmp.mp3'
+    subprocess.run(
+        ['ffmpeg', '-y', '-i', path, '-filter:a', f'atempo={speed}', tmp],
+        check=True, capture_output=True
+    )
+    os.replace(tmp, path)
 
 
 def get_voice_id(language: str = 'ko') -> str:
@@ -62,5 +76,6 @@ def generate_segments_tts(segments: list, out_dir: str, language: str = 'ko') ->
         path = os.path.join(out_dir, f'audio_{idx:02d}.mp3')
         print(f'   TTS [{idx+1}/{len(segments)}]: {narration[:35]}...')
         generate_tts(narration, path, voice_id=voice_id)
+        _speedup_audio(path)
         results.append({'audio_path': path, 'narration': narration, 'index': idx})
     return results
