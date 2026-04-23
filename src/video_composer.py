@@ -395,18 +395,26 @@ def _make_subtitle_clip(title: str, image_path: str,
 
     audio        = AudioFileClip(audio_path)
     duration     = audio.duration
-    total_chars  = len(narration)
     total_frames = max(1, int(duration * FPS))
 
-    # 전체 나레이션 기준 레이아웃 고정
-    _ref_draw  = ImageDraw.Draw(base_img.copy())
-    full_lines = _wrap_text(_ref_draw, narration, sub_font, SUB_MAX_WIDTH)[:MAX_SUB_LINES]
-    char_ranges = _line_char_ranges(narration, full_lines)
+    # 나레이션 전체 줄 분할 (줄 수 제한 없음 — 줄 단위로 순서대로 전환)
+    _ref_draw = ImageDraw.Draw(base_img.copy())
+    all_lines = _wrap_text(_ref_draw, narration, sub_font, SUB_MAX_WIDTH)
+    if not all_lines:
+        all_lines = [narration] if narration else ['']
 
-    # 타이핑 속도 보정
-    natural_end = total_chars / TYPING_SPEED
-    typing_end  = min(natural_end, duration * 0.85)
-    eff_speed   = total_chars / typing_end if typing_end > 0 else float('inf')
+    # 각 줄에 오디오 시간 비례 배분 (글자 수 기준)
+    line_lengths  = [max(1, len(l)) for l in all_lines]
+    total_lc      = sum(line_lengths)
+    natural_end   = total_lc / TYPING_SPEED
+    typing_end    = min(natural_end, duration * 0.85)
+
+    line_ranges: list[tuple[float, float]] = []
+    elapsed = 0.0
+    for lc in line_lengths:
+        t_end = elapsed + (lc / total_lc) * typing_end
+        line_ranges.append((elapsed, t_end))
+        elapsed = t_end
 
     # ── 프레임 생성 ──────────────────────────────────────────────────
     frames = []
@@ -422,32 +430,41 @@ def _make_subtitle_clip(title: str, image_path: str,
             curr_img = _kb(img_sq, prog, kb_mode)
 
             if i < TRANS_F and trans_mode is not None and prev_img_arr is not None:
-                p_raw    = (i + 1) / TRANS_F
-                p_eased  = _ease_in_out(p_raw)
+                p_eased  = _ease_in_out((i + 1) / TRANS_F)
                 img_area = _trans_frame(prev_img_arr, curr_img, p_eased, trans_mode)
             else:
                 img_area = curr_img
 
             frame_arr[img_y:img_y + IMG_SIZE, 0:IMG_SIZE] = img_area
 
-        # 3. 자막 텍스트: 타이핑 효과 → 이미지 위에 stroke로 그리기
-        n = total_chars if t >= typing_end else min(int(t * eff_speed) + 1, total_chars)
-        if n > 0:
+        # 3. 현재 시각에 해당하는 줄 선택 + 타이핑 효과
+        cur_li = len(all_lines) - 1
+        for li, (t_start, t_end) in enumerate(line_ranges):
+            if t < t_end:
+                cur_li = li
+                break
+
+        current_line        = all_lines[cur_li]
+        t_start, t_end      = line_ranges[cur_li]
+        line_dur            = t_end - t_start
+
+        if line_dur <= 0 or t >= t_end:
+            visible = current_line
+        else:
+            progress = (t - t_start) / line_dur
+            n        = max(1, min(int(progress * len(current_line)) + 1,
+                                  len(current_line)))
+            visible  = current_line[:n]
+
+        if visible:
             frame_pil = Image.fromarray(frame_arr)
             draw      = ImageDraw.Draw(frame_pil)
-            y         = sub_y
-            for line_text, (c_start, c_end) in zip(full_lines, char_ranges):
-                if n < c_start:
-                    break
-                visible = line_text[:n - c_start] if n < c_end else line_text
-                if visible:
-                    lw = draw.textlength(visible, font=sub_font)
-                    draw.text(
-                        ((W - lw) // 2, y), visible,
-                        font=sub_font, fill=C_WHITE,
-                        stroke_width=SUB_STROKE, stroke_fill=C_BLACK,
-                    )
-                y += line_h
+            lw = draw.textlength(visible, font=sub_font)
+            draw.text(
+                ((W - lw) // 2, sub_y), visible,
+                font=sub_font, fill=C_WHITE,
+                stroke_width=SUB_STROKE, stroke_fill=C_BLACK,
+            )
             frame_arr = np.array(frame_pil)
 
         frames.append(frame_arr)
@@ -460,8 +477,8 @@ def _make_subtitle_clip(title: str, image_path: str,
 
     font_size = sub_font.size if hasattr(sub_font, 'size') else '?'
     print(f'   [타이핑] "{narration[:25]}..." '
-          f'| {total_chars}자 | 폰트 {font_size}px | {len(full_lines)}줄 '
-          f'| {typing_end:.1f}s 내 완성 (속도 {eff_speed:.1f}cps) | 총 {duration:.1f}s'
+          f'| {total_lc}자 {len(all_lines)}줄 | 폰트 {font_size}px '
+          f'| {typing_end:.1f}s 내 완성 | 총 {duration:.1f}s'
           f' | KB={kb_mode} TRANS={trans_mode or "없음"}')
     return clip
 
