@@ -13,10 +13,12 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 try:
-    from moviepy.editor import ImageSequenceClip, AudioFileClip, concatenate_videoclips
+    from moviepy.editor import (ImageSequenceClip, AudioFileClip,
+                                  concatenate_videoclips, concatenate_audioclips)
     MOVIEPY_V2 = False
 except ModuleNotFoundError:
-    from moviepy import ImageSequenceClip, AudioFileClip, concatenate_videoclips
+    from moviepy import (ImageSequenceClip, AudioFileClip,
+                          concatenate_videoclips, concatenate_audioclips)
     MOVIEPY_V2 = True
 
 W, H     = 1080, 1920
@@ -426,8 +428,7 @@ def _concat_audio_ffmpeg(audio_paths: list, out_path: str) -> str:
 
 def _make_segment_clip(title: str, image_path: str,
                        timed_chunks: list,
-                       seg_audio_path: str,
-                       total_duration: float,
+                       combined_audio,
                        img_sq: np.ndarray = None,
                        prev_img_arr: np.ndarray = None,
                        kb_mode: str = 'zoom_in',
@@ -435,15 +436,11 @@ def _make_segment_clip(title: str, image_path: str,
     """
     세그먼트 전체를 하나의 VideoClip으로 생성.
 
-    timed_chunks: [{'text': str, 't_start': float, 't_end': float}, ...]
-      - t_start/t_end는 세그먼트 시작 기준 누적 초
-    seg_audio_path: 청크 오디오를 이어붙인 통합 MP3 경로
-    total_duration: 세그먼트 전체 길이(초)
-
-    효과:
-      - KB 애니메이션: 세그먼트 전체 duration 기준으로 연속 진행 (청크마다 재시작 없음)
-      - 자막: 현재 t에 해당하는 청크 텍스트를 즉시 표시 (타이핑 없음)
-      - 전환: 세그먼트 첫 프레임에만 적용
+    timed_chunks : [{'text', 't_start', 't_end'}, ...]
+      t_start/t_end 는 combined_audio 의 타임라인과 1:1로 일치한다.
+      (같은 AudioFileClip 객체로 duration을 재고 합쳤기 때문)
+    combined_audio : concatenate_audioclips() 로 만든 AudioClip 객체
+      → 파일 경로 아님 (파일 재로드 없이 동일 타임라인 보장)
     """
     if img_sq is None and image_path:
         img_sq = _load_img_sq(image_path)
@@ -452,10 +449,11 @@ def _make_segment_clip(title: str, image_path: str,
     base_img, img_y, sub_font, line_h, sub_y, pad = _make_base_bg(title, first_text)
     base_arr = np.array(base_img)
 
-    audio        = AudioFileClip(seg_audio_path)
-    total_frames = max(1, int(total_duration * FPS))
+    # combined_audio.duration 을 기준으로 프레임 수 결정 (재로드 없음)
+    duration     = combined_audio.duration
+    total_frames = max(1, int(duration * FPS))
 
-    # 청크별 줄 분할을 미리 계산 (매 프레임마다 하지 않도록)
+    # 청크별 줄 분할 사전 계산
     _ref_draw = ImageDraw.Draw(base_img.copy())
     chunk_lines = [
         _wrap_text(_ref_draw, c['text'], sub_font, SUB_MAX_WIDTH)[:MAX_SUB_LINES]
@@ -465,7 +463,7 @@ def _make_segment_clip(title: str, image_path: str,
     frames = []
     for i in range(total_frames):
         t    = i / FPS
-        prog = min(t / max(total_duration, 0.001), 1.0)
+        prog = min(t / max(duration, 0.001), 1.0)
 
         # 1. 베이스 복사
         frame_arr = base_arr.copy()
@@ -506,14 +504,14 @@ def _make_segment_clip(title: str, image_path: str,
 
     clip = ImageSequenceClip(frames, fps=FPS)
     if MOVIEPY_V2:
-        clip = clip.with_audio(audio)
+        clip = clip.with_audio(combined_audio)
     else:
-        clip = clip.set_audio(audio)
+        clip = clip.set_audio(combined_audio)
 
     font_size = getattr(sub_font, 'size', '?')
     chunk_summary = ' / '.join(c['text'][:12] for c in timed_chunks)
     print(f'   [세그먼트] {len(timed_chunks)}청크 | 폰트 {font_size}px'
-          f' | {total_duration:.1f}s | KB={kb_mode} TRANS={trans_mode or "없음"}'
+          f' | {duration:.1f}s | KB={kb_mode} TRANS={trans_mode or "없음"}'
           f'\n             자막: {chunk_summary}')
     return clip
 
@@ -557,35 +555,28 @@ def compose_video(segments_data: list, title: str, output_path: str) -> str:
             {'text': seg['narration'], 'audio_path': seg['audio_path']}
         ]
 
-        # 각 청크의 오디오 길이를 읽어 누적 타이밍 계산
+        # ── 핵심: 같은 AudioFileClip 객체로 duration 측정 + concat 동시 처리 ──
+        # 파일 재로드 없이 동일 타임라인 보장 → 자막-오디오 싱크 오차 제거
+        audio_clips = [AudioFileClip(c['audio_path']) for c in raw_chunks]
+
         timed_chunks = []
         elapsed = 0.0
-        for c in raw_chunks:
-            a   = AudioFileClip(c['audio_path'])
-            dur = a.duration
-            a.close()
+        for c, aclip in zip(raw_chunks, audio_clips):
             timed_chunks.append({
                 'text':    c['text'],
                 't_start': elapsed,
-                't_end':   elapsed + dur,
+                't_end':   elapsed + aclip.duration,
             })
-            elapsed += dur
-        total_duration = elapsed
+            elapsed += aclip.duration
 
-        # 청크 오디오를 하나로 합침 (1개면 그대로, 여러 개면 ffmpeg concat)
-        if len(raw_chunks) == 1:
-            seg_audio = raw_chunks[0]['audio_path']
-        else:
-            seg_dir   = os.path.dirname(raw_chunks[0]['audio_path'])
-            seg_audio = os.path.join(seg_dir, f'seg_{i:02d}_combined.mp3')
-            _concat_audio_ffmpeg([c['audio_path'] for c in raw_chunks], seg_audio)
+        combined_audio = (audio_clips[0] if len(audio_clips) == 1
+                          else concatenate_audioclips(audio_clips))
 
         clip = _make_segment_clip(
             title          = title,
             image_path     = seg.get('image_path', ''),
             timed_chunks   = timed_chunks,
-            seg_audio_path = seg_audio,
-            total_duration = total_duration,
+            combined_audio = combined_audio,
             img_sq         = img_sqs[i],
             prev_img_arr   = prev_img_arr,
             kb_mode        = kb_mode,
