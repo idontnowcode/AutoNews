@@ -1,0 +1,44 @@
+name: 모바일 포맷 테스트 (YouTube Shorts 1080×1920)
+
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  mobile-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 설정
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: 시스템 패키지 설치 (FFmpeg + 한글 폰트)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-nanum fonts-nanum-extra
+          fc-cache -fv
+
+      - name: Python 패키지 설치
+        run: pip install --no-cache-dir -r requirements.txt
+
+      - name: 모바일 포맷 단위 테스트 실행
+        run: python -m pytest tests/test_mobile_video.py -v --tb=short
+
+      - name: 테스트 결과 아티팩트 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-test-results-${{ github.run_number }}
+          path: /tmp/test_mobile_*.mp4
+          retention-days: 1
+          if-no-files-found: ignore
