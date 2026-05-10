@@ -1,8 +1,9 @@
 name: 일분 스튜디오 - 뉴스 Shorts 업로드
 
 on:
-  schedule:
-    - cron: '0 * * * *'    # 매시간 — 실제 실행 여부는 Supabase settings로 제어
+  # schedule 일시 정지 (2026-05-11)
+  # schedule:
+  #   - cron: '0 * * * *'    # 매시간 — 실제 실행 여부는 Supabase settings로 제어
   workflow_dispatch:
     inputs:
       news_id:
